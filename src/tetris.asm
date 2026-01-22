@@ -1,59 +1,57 @@
     org 100h
     use16
 
-MINO_L EQU 00h
-MINO_J EQU 01h
-MINO_S EQU 02h
-MINO_Z EQU 03h
-MINO_T EQU 04h
-MINO_O EQU 05h
-MINO_I EQU 06h
+MINO_NONE EQU 00h
+MINO_L    EQU 01h
+MINO_J    EQU 02h
+MINO_S    EQU 03h
+MINO_Z    EQU 04h
+MINO_T    EQU 05h
+MINO_O    EQU 06h
+MINO_I    EQU 07h
 
 start:
-    int3
-
     ; screen mode 13h
     mov ax, 0013h
     int 10h
 
-    ; draw block
-    push 0      ; y
-    push 0      ; x
-    push MINO_L ; mino
-    call draw_block
-    add sp, 6
+    call draw_matrix
 
     ; exit 0
     mov ax, 4C00h
     int 21h
 
-BLOCK_SIZE EQU 13
-BLOCK_ORIGIN_X EQU 10
-BLOCK_ORIGIN_Y EQU 50
+MATRIX_H EQU 40
+VISIBLE_MATRIX_H EQU 20
+MATRIX_W EQU 10
 
-mino_colors db 2Ah, 37h, 2Fh, 28h, 23h, 0Eh, 0Bh
+SCREEN_W EQU 320
+SCREEN_H EQU 200
+BLOCK_SIZE EQU 9
+MATRIX_ORIGIN_X EQU (SCREEN_W-(BLOCK_SIZE*MATRIX_W))/2
+MATRIX_ORIGIN_Y EQU SCREEN_H - (SCREEN_H-(BLOCK_SIZE*VISIBLE_MATRIX_H))/2
+
+mino_colors db 00h, 2Ah, 37h, 2Fh, 28h, 23h, 0Eh, 0Bh
 draw_block:
     push bp
     mov  bp, sp
     push bx
     push si
+    push di
 
+    ; setup registers for write-pixel interrupt
     mov si, [bp+4]
     mov al, [mino_colors+si]
     mov cx, [bp+6]
-    add cx, BLOCK_ORIGIN_X
     mov dx, [bp+8]
-    add dx, BLOCK_ORIGIN_Y
     mov bx, 0
     mov ah, 0Ch
 
     xor si, si
-    xor di, di
 .loop1:
     cmp si, BLOCK_SIZE
     jge .loop1_end
     inc si
-    sub cx, di
     xor di, di
 .loop2:
     cmp di, BLOCK_SIZE
@@ -63,11 +61,70 @@ draw_block:
     int 10h
     jmp .loop2
 .loop2_end:
+    sub cx, BLOCK_SIZE
     inc dx
     jmp .loop1
 .loop1_end:
 
+    pop di
     pop si
     pop bx
+    pop bp
+    ret
+
+matrix: times (MATRIX_H*MATRIX_W) db MINO_I
+; ...
+; 10 11 12 13 14 15 16 17 18 19
+;  0  1  2  3  4  5  6  7  8  9
+
+draw_matrix:
+    push bp
+    mov  bp, sp
+    push bx
+    push si
+    push di
+
+    xor si, si
+.loop1:
+    cmp si, VISIBLE_MATRIX_H
+    jge .loop1_end
+    inc si
+    xor di, di
+.loop2:
+    cmp di, MATRIX_W
+    jge .loop2_end
+    inc di
+    
+    ; draw block
+    ;ax = MATRIX_ORIGIN_Y - (BLOCK_SIZE*(si+1))
+    mov ax, BLOCK_SIZE
+    mul si
+    add ax, BLOCK_SIZE
+    neg ax
+    add ax, MATRIX_ORIGIN_Y - BLOCK_SIZE
+    push ax      ; y
+    ;ax = MATRIX_ORIGIN_X + (BLOCK_SIZE*di)
+    mov ax, BLOCK_SIZE
+    mul di
+    add ax, MATRIX_ORIGIN_X
+    push ax      ; x
+    mov ax, MATRIX_W
+    mul di
+    add ax, si
+    mov bx, ax
+    xor ah, ah
+    mov al, [bx+matrix]
+    push ax ; mino
+    call draw_block
+    add sp, 6
+
+    jmp .loop2
+.loop2_end:
+    jmp .loop1
+.loop1_end:
+
+    pop bx
+    pop di
+    pop si
     pop bp
     ret
