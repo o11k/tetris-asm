@@ -2,7 +2,7 @@
     "emeraldwalk.runonsave": {
         "commands": [
             {
-                "match": ".*\\.asm",
+                "match": "src/.*\\.(asm|inc)",
                 "cmd": "make"
             }
         ]
