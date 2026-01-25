@@ -1,2 +1,3 @@
-# tetris-asm
-Tetris for DOS written in x68 assembly
+# Assembly Tetris
+
+Tetris for DOS written in 8086 assembly
