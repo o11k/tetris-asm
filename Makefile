@@ -4,7 +4,7 @@ DIST = dist
 
 all: $(DIST)/tetris.com
 
-$(DIST)/tetris.com: $(DIST) $(SRC)/tetris.asm
+$(DIST)/tetris.com: $(DIST) $(SRC)/tetris.asm $(SRC)/render.inc
 	$(ASM) $(SRC)/tetris.asm $(DIST)/tetris.com
 
 $(DIST):

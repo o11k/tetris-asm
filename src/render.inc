@@ -8,6 +8,14 @@ BLOCK_SIZE EQU 9
 MATRIX_ORIGIN_X EQU (SCREEN_W-(BLOCK_SIZE*MATRIX_W))/2
 MATRIX_ORIGIN_Y EQU SCREEN_H - (SCREEN_H-(BLOCK_SIZE*VISIBLE_MATRIX_H))/2
 
+MATRIX_BOTTOM EQU MATRIX_ORIGIN_Y
+MATRIX_TOP    EQU MATRIX_ORIGIN_Y - (BLOCK_SIZE*VISIBLE_MATRIX_H)
+MATRIX_LEFT   EQU MATRIX_ORIGIN_X
+MATRIX_RIGHT  EQU MATRIX_ORIGIN_X + (BLOCK_SIZE*MATRIX_W)
+
+BORDER_WIDTH EQU 1
+BORDER_COLOR EQU 0Fh  ; white
+
 mino_colors db 00h, 2Ah, 37h, 2Fh, 28h, 23h, 0Eh, 0Bh
 ; void draw_block(Mino mino, word left_x, word top_y)
 draw_block:
@@ -88,6 +96,8 @@ draw_matrix:
     push si
     push di
 
+    call draw_borders
+
     xor si, si
 .loop1:
     cmp si, VISIBLE_MATRIX_H
@@ -121,4 +131,84 @@ draw_matrix:
     pop di
     pop si
     pop bp
+    ret
+
+; void draw_border(
+;    word color,
+;    word border_width,
+;    word obj_top,     ; inclusive
+;    word obj_bottom,  ; exclusive
+;    word obj_right,   ; exclusive
+;    word obj_left     ; inclusive
+; )
+draw_border:
+    push bp
+    mov  bp, sp
+    push si
+    push bx
+
+    ; setup registers for write-pixel interrupt
+    mov al, [bp+4]  ; color
+    mov bx, 0       ; page
+    mov ah, 0Ch
+
+    dec word [bp+10] ; bottom
+    inc word [bp+14] ; left
+
+    xor si, si
+.loop_border_width:
+    cmp si, [bp+6] ; width
+    jnl .loop_border_width_end
+
+    dec word [bp+8]  ; top
+    inc word [bp+10] ; bottom
+    inc word [bp+12] ; right
+    dec word [bp+14] ; left
+
+    mov dx, [bp+8] ; top
+.loop_vertical:
+    cmp dx, [bp+10] ; bottom
+    jg  .loop_vertical_end
+
+    mov cx, [bp+12] ; right
+    int 10h
+    mov cx, [bp+14] ; left
+    int 10h
+
+    inc dx
+    jmp .loop_vertical
+.loop_vertical_end:
+
+mov cx, [bp+14] ; left
+.loop_horizontal:
+    cmp cx, [bp+12] ; right
+    jg  .loop_horizontal_end
+
+    mov dx, [bp+8]  ; top
+    int 10h
+    mov dx, [bp+10] ; bottom
+    int 10h
+
+    inc cx
+    jmp .loop_horizontal
+.loop_horizontal_end:
+
+    inc si
+    jmp .loop_border_width
+.loop_border_width_end:
+
+    pop bx
+    pop si
+    pop bp
+    ret
+
+draw_borders:
+    push word MATRIX_LEFT
+    push word MATRIX_RIGHT
+    push word MATRIX_BOTTOM
+    push word MATRIX_TOP
+    push word BORDER_WIDTH
+    push word BORDER_COLOR
+    call draw_border
+    add sp, 12
     ret
