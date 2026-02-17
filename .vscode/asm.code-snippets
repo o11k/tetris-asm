@@ -1,0 +1,36 @@
+{
+	"Assembly Loop": {
+		"prefix": "loop",
+		"body": [
+			"    ; setup loop $1",
+			".loop_$1:",
+			"    ; test loop variable $1",
+			"    je .loop_$1_end",
+			"",
+			"    ; advance loop $1",
+			"    jmp .loop_$1",
+			".loop_$1_end:"
+		],
+	},
+	"Assembly Procedure": {
+		"prefix": "proc",
+		"body": [
+			"$1:",
+			"    push bp",
+			"    mov  bp, sp",
+			"    push si",
+			"    push di",
+			"    push bx",
+			"",
+			"    ;sub sp, @@@",
+			"",
+			".done:",
+			"    ;add sp, @@@",
+			"    pop bx",
+			"    pop di",
+			"    pop si",
+			"    pop bp",
+			"    ret"
+		]
+	}
+}
