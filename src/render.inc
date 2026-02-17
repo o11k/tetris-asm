@@ -63,9 +63,6 @@ draw_matrix_block:
     push bp
     mov  bp, sp
 
-    cmp word [bp+4], MINO_NONE
-    je  .cleanup
-
     ;y = origin_y - block_size - block_size*row
     mov ax, BLOCK_SIZE
     mul word [bp+6]

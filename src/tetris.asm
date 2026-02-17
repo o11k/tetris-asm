@@ -11,17 +11,51 @@ MINO_O    EQU 06h
 MINO_I    EQU 07h
 
 start:
+    push bp
+    mov bp, sp
+
     ; video mode 13h
     mov ax, 0013h
     int 10h
 
     call draw_matrix
 
+    push 20
+    push 20
+    push 24h
+    push text_message
+
+    xor si, si
+.loop_line:
+    cmp si, 8
+    jge .loop_line_end
+
+    call render_text
+    add word [bp-2], 8
+    add word [bp-8], 16+1
+
+    inc si
+    jmp .loop_line
+.loop_line_end:
+
+    add sp, 8
+
     ; exit 0
     mov ax, 4C00h
     int 21h
 
+text_message db \
+      1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 0, \
+     17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 0, \
+     33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 0, \
+     49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 0, \
+     65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 0, \
+     81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 0, \
+     97, 98, 99,100,101,102,103,104,105,106,107,108,109,110,111,112, 0, \
+    113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,  0, 0
+
 include 'render.inc'
+include 'render_text.inc'
 
 ; appears upside-down
 matrix db \
