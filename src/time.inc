@@ -40,6 +40,7 @@ get_accurate_time:
     sti
 
     mov ax, bx
+    neg ax      ; Make PIT count up instead of down
 
 .done:
     pop bx
