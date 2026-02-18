@@ -1,14 +1,18 @@
 ASM = fasm
-SRC = src
-DIST = dist
+SRC_DIR = src
+DST_DIR = dist
 
-all: $(DIST)/tetris.com
+SRC_FILE = $(SRC_DIR)/tetris.asm
+DST_FILE = $(DST_DIR)/tetris.com
+INC_FILES = $(wildcard $(SRC_DIR)/*.inc)
 
-$(DIST)/tetris.com: $(DIST) $(SRC)/tetris.asm $(SRC)/render.inc $(SRC)/render_text.inc $(SRC)/font8x8_basic.inc
-	$(ASM) $(SRC)/tetris.asm $(DIST)/tetris.com
+all: $(DST_DIR)/tetris.com
 
-$(DIST):
-	mkdir -p $(DIST)
+$(DST_FILE): $(DST_DIR) $(SRC_FILE) $(INC_FILES)
+	$(ASM) $(SRC_DIR)/tetris.asm $(DST_DIR)/tetris.com
+
+$(DST_DIR):
+	mkdir -p $(DST_DIR)
 
 clean:
-	rm -r $(DIST)
+	rm -r $(DST_DIR)
