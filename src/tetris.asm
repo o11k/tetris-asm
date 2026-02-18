@@ -23,55 +23,23 @@ start:
     call draw_matrix
 
 .loop_main:
-    mov di, word [int_09h_scan_code]
+    call get_keyboard_state
+    mov si, ax
+    mov ax, [si+1]
+    test ax, 2
+    jz .loop_main
 
-    ; dx = color = keyup ? fuchsia : green
-    test di, 80h
-    jz .if_keydown
-.if_keyup:
-    mov dx, 24h
-    jmp .if_end
-.if_keydown:
-    mov dx, 2Fh
-.if_end:
-
-    ; si = keyboard_table_names[scancode & 0x7F]
-    mov si, di
-    and si, 7Fh
-    shl si, 1
-    mov si, [keyboard_table_names+si]
-
-    ; render
-    push 20
-    push 20
-    push dx
-    push si
-    call render_text
-    add sp, 8
-
-.wait_for_new:
-    cmp di, word [int_09h_scan_code]
-    jz .wait_for_new
-
-    ; erase
-    push 20
-    push 20
-    push 0
-    push si
-    call render_text
-    add sp, 8
-
-    jmp .loop_main
-.loop_main_end:
-
+.loop_main2:
+    call get_keyboard_state
+    mov si, ax
+    mov ax, [si+1]
+    test ax, 2
+    jz .loop_main2
 
     call restore_int_09h
     ; exit 0
     mov ax, 4C00h
     int 21h
-
-message_keyup:   db "UPUP", 0
-message_keydown: db "DOWN", 0
 
 
 include 'render.inc'
