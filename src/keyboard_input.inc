@@ -37,22 +37,16 @@ restore_int_09h:
     pop ds
     ret
 
-is_keyup: dw 0
+int_09h_scan_code: dw 0
 
 new_int_09h:
     push ax
 
-    in   al, 60h  ; read scan code
-    test al, 80h  ; is keyup?
-    jz .keydown
-
-.keyup:
-    mov word [is_keyup], 1
-
-    jmp .done
-.keydown:
-    mov word [is_keyup], 0
+    in  al, 60h  ; read scan code
+    mov byte [int_09h_scan_code], al
 
 .done:
     pop ax
     jmp far [old_int_09h]  ; chain old handler
+
+include "keyboard_tables.inc"

@@ -22,41 +22,48 @@ start:
 
     call draw_matrix
 
-    call get_bios_tick
-    mov di, ax
-
 .loop_main:
-    call get_bios_tick
-    cmp ax, di
-    jb  .loop_main_end  ; break if overflow
-    sub ax, 91  ; 5 seconds
-    cmp ax, di
-    jge .loop_main_end  ; break if 5 seconds passed
+    mov di, word [int_09h_scan_code]
 
-    cmp word [is_keyup], 0
-    jz  .if_keydown
-
+    ; dx = color = keyup ? fuchsia : green
+    test di, 80h
+    jz .if_keydown
 .if_keyup:
-    push 20
-    push 20
-    push 24h
-    push message_keyup
-    call render_text
-    add sp, 8
-
+    mov dx, 24h
     jmp .if_end
 .if_keydown:
+    mov dx, 2Fh
+.if_end:
+
+    ; si = keyboard_table_names[scancode & 0x7F]
+    mov si, di
+    and si, 7Fh
+    shl si, 1
+    mov si, [keyboard_table_names+si]
+
+    ; render
     push 20
     push 20
-    push 2Fh
-    push message_keydown
+    push dx
+    push si
     call render_text
     add sp, 8
 
-.if_end:
+.wait_for_new:
+    cmp di, word [int_09h_scan_code]
+    jz .wait_for_new
+
+    ; erase
+    push 20
+    push 20
+    push 0
+    push si
+    call render_text
+    add sp, 8
 
     jmp .loop_main
 .loop_main_end:
+
 
     call restore_int_09h
     ; exit 0
