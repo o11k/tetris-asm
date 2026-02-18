@@ -119,12 +119,12 @@ pointer_chars: db "^>v<", 0
 old_pointer_pos_x: dw 21
 pointer_pos_x: dw 20
 
-include 'render.inc'
-include 'render_text.inc'
-include 'keyboard_input.inc'
+include 'input/time.inc'
+include 'input/keyboard_input.inc'
+include 'input/controls.inc'
+include 'output/render.inc'
+include 'output/render_text.inc'
 include 'misc.inc'
-include 'time.inc'
-include 'controls.inc'
 
 ; appears upside-down
 matrix db \
