@@ -71,6 +71,7 @@ include 'output/render_text.inc'
 include 'misc.inc'
 include 'logic/prng.inc'
 include 'logic/tetrimino_generation.inc'
+include 'logic/tetrimino_movement.inc'
 
 ; appears upside-down
 matrix db \
