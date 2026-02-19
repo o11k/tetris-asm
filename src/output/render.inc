@@ -209,3 +209,42 @@ draw_borders:
     call draw_border
     add sp, 12
     ret
+
+
+macro _draw_matrix_tetrimino_single index {
+    mov al, byte [bx+TETRIMINO_OFF_ROOT +0]
+    add al, byte [bx+TETRIMINO_OFF_MINOS+0+(index*2)]
+    mov ah, byte [bx+TETRIMINO_OFF_ROOT +1]
+    add ah, byte [bx+TETRIMINO_OFF_MINOS+1+(index*2)]
+    xor  cx, cx
+    mov  cl, ah
+    push cx
+    mov  cl, al
+    push cx
+    mov  cl, byte [bx+TETRIMINO_OFF_TYPE]
+    push cx
+    call draw_matrix_block
+    add  sp, 6
+}
+; void draw_matrix_tetrimino(Tetrimino *t)
+draw_matrix_tetrimino:
+    push bp
+    mov  bp, sp
+    push si
+    push di
+    push bx
+
+    mov bx, word [bp+4]
+
+    _draw_matrix_tetrimino_single 0
+    _draw_matrix_tetrimino_single 1
+    _draw_matrix_tetrimino_single 2
+    _draw_matrix_tetrimino_single 3
+
+.done:
+    ;add sp, @@@
+    pop bx
+    pop di
+    pop si
+    pop bp
+    ret

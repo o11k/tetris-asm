@@ -56,3 +56,23 @@ word_to_hex:
     pop bx
     pop bp
     ret
+
+
+; void memcpy(byte *dst, byte *src, word len)
+memcpy:
+    push bp
+    mov  bp, sp
+    push si
+    push di
+
+    mov di, word [bp+4]
+    mov si, word [bp+6]
+    mov cx, word [bp+8]
+
+    cld
+    rep movsb
+
+    pop di
+    pop si
+    pop bp
+    ret

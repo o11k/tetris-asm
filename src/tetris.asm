@@ -41,28 +41,14 @@ start:
 
     jmp .skip_generate
 .generate:
-    ; delete old
-    push 20
-    push 20
-    push 00h
-    push mino_str_buffer
-    call render_text
-    add  sp, 8
-
-    ; generate
-    call next_tetrimino
-    push mino_str_buffer
+    call next_mino
+    push tetrimino_buffer
     push ax
-    call word_to_hex
-    add  sp, 4
-
-    ; write new
-    push 20
-    push 20
-    push 0Fh
-    push mino_str_buffer
-    call render_text
-    add  sp, 8
+    call initialize_tetrimino
+    add sp, 4
+    push tetrimino_buffer
+    call draw_matrix_tetrimino
+    add sp, 2
 
 .skip_generate:
     jmp .main_loop
@@ -75,7 +61,7 @@ start:
     int 21h
 
 
-mino_str_buffer: db 0,0,0,0,0
+tetrimino_buffer: times TETRIMINO_SIZE db 0
 
 include 'input/time.inc'
 include 'input/keyboard_input.inc'
