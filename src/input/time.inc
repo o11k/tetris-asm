@@ -11,8 +11,8 @@ get_accurate_time:
     push di
     push bx
 
-.read_loop:
     cli
+.read_loop:
 
     ; read BIOS tick into si:di
     mov ah, 00h
