@@ -142,3 +142,25 @@ tetrimino_try_move:
     pop bx
     pop bp
     ret
+
+; bool tetrimino_is_on_ground(Matrix *m, Tetrimino *t)
+tetrimino_is_on_ground:
+    push bp
+    mov  bp, sp
+    push bx
+
+    mov bx, word [bp+6]
+    dec byte [bx+TETRIMINO_OFF_ROOT+0]
+
+    push bx
+    push word [bp+4]
+    call tetrimino_detect_collision
+    add sp, 4
+
+    inc byte [bx+TETRIMINO_OFF_ROOT+0]
+
+    xor ax, 1
+
+    pop bx
+    pop bp
+    ret

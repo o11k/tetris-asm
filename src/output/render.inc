@@ -85,50 +85,6 @@ draw_matrix_block:
     pop bp
     ret
 
-; void draw_matrix(void)
-draw_matrix:
-    push bp
-    mov  bp, sp
-    push bx
-    push si
-    push di
-
-    call draw_borders
-
-    xor si, si
-.loop1:
-    cmp si, VISIBLE_MATRIX_H
-    jge .loop1_end
-    xor di, di
-.loop2:
-    cmp di, MATRIX_W
-    jge .loop2_end
-
-    push di  ; col
-    push si  ; row
-    ; mino
-    mov ax, MATRIX_W
-    mul si
-    add ax, di
-    mov bx, ax
-    xor ax, ax
-    mov al, [bx+matrix]
-    push ax
-    call draw_matrix_block
-    add sp, 6
-
-    inc di
-    jmp .loop2
-.loop2_end:
-    inc si
-    jmp .loop1
-.loop1_end:
-
-    pop bx
-    pop di
-    pop si
-    pop bp
-    ret
 
 ; void draw_border(
 ;    word color,
@@ -270,6 +226,91 @@ delete_matrix_tetrimino:
     add  sp, 2
 
     mov byte [si+TETRIMINO_OFF_TYPE], bl
+
+    pop si
+    pop bx
+    pop bp
+    ret
+
+
+_dgsd_last_frame: times MATRIX_W*MATRIX_H db MINO_NONE
+_dgsd_curr_frame: times MATRIX_W*MATRIX_H db 0
+_dgsd_minos: times 2*4 dw 0
+
+; void draw_game_state_diff(State *state)
+draw_game_state_diff:
+    push bp
+    mov  bp, sp
+    push bx
+    push si
+
+    mov bx, word [bp+4]
+
+    ; Copy matrix to frame
+    push MATRIX_W*MATRIX_H
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    push word _dgsd_curr_frame
+    call memcpy
+    add sp, 6
+
+    ; Tetrimino to concrete (row,col)s
+    push _dgsd_minos
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    call tetrimino_get_coords
+    add sp, 4
+
+    ; dl = mino type
+    mov si, word [bx+GAME_STATE_OFF_TETRIMINO]
+    mov dl, byte [si+TETRIMINO_OFF_TYPE]
+
+    ; Copy tetrimino to matrix
+    mov cl, MATRIX_W
+macro _dgsd_mino_to_frame index {
+    mov ax, word [_dgsd_minos+(index*4)+0]
+    mul cl
+    add ax, word [_dgsd_minos+(index*4)+2]
+    mov si, ax
+    mov byte [_dgsd_curr_frame+si], dl
+}
+    _dgsd_mino_to_frame 0
+    _dgsd_mino_to_frame 1
+    _dgsd_mino_to_frame 2
+    _dgsd_mino_to_frame 3
+
+    ; Draw diff between last and curr
+    xor si, si
+.loop_diff:
+    cmp si, MATRIX_H*MATRIX_W
+    jge .loop_diff_end
+
+    mov al, byte [_dgsd_last_frame+si]
+    cmp al, byte [_dgsd_curr_frame+si]
+    je  .skip_draw
+
+    ; ax = row, dx = col
+    xor dx, dx
+    mov ax, si
+    mov cx, MATRIX_W
+    div cx
+    push dx
+    push ax
+    xor cx, cx
+    mov cl, byte [_dgsd_curr_frame+si]
+    push cx
+    call draw_matrix_block
+    add sp, 6
+.skip_draw:
+
+    inc si
+    jmp .loop_diff
+.loop_diff_end:
+
+    ; Copy curr to last
+    push MATRIX_W*MATRIX_H
+    push _dgsd_curr_frame
+    push _dgsd_last_frame
+    call memcpy
+    add sp, 6
 
     pop si
     pop bx

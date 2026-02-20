@@ -76,3 +76,21 @@ memcpy:
     pop si
     pop bp
     ret
+
+
+; void memset(byte *dst, byte val, word len)
+memset:
+    push bp
+    mov  bp, sp
+    push di
+
+    mov  di, word [bp+4]   ; dst
+    mov  al, byte [bp+6]   ; val
+    mov  cx, word [bp+8]   ; len
+
+    cld
+    rep stosb              ; fill CX bytes at ES:DI with AL
+
+    pop di
+    pop bp
+    ret

@@ -3,6 +3,20 @@
 
 include 'constants.inc'
 
+macro show_word x, y, val {
+    push word_str_buffer
+    push val
+    call word_to_hex
+    add sp, 4
+
+    push y
+    push x
+    push 0Fh
+    push word_str_buffer
+    call render_text
+    add sp, 8
+}
+
 start:
     push bp
     mov bp, sp
@@ -23,83 +37,30 @@ start:
     add sp, 2
 
 .main:
-    call draw_matrix
+    call draw_borders
 
-    call next_mino
-    push tetrimino_buffer
-    push ax
-    call initialize_tetrimino
-    add sp, 4
-    push tetrimino_buffer
-    call draw_matrix_tetrimino
-    add sp, 2
+    push g_tetrimino
+    push g_matrix
+    push g_game_state
+    call initialize_game_state
+    add  sp, 6
 
-.main_loop:
-    call get_controls_state
-    mov  si, ax
+    mov byte [g_tetrimino+TETRIMINO_OFF_ROOT+0], 0
+    mov byte [g_tetrimino+TETRIMINO_OFF_ROOT+1], 0
 
-    ; Esc = exit
-    mov  al, byte [si+CONTROLS_STATE_OFF_PAUSE]
-    test al, KEYBOARD_STATE_MASK_WAS_PRESSED
-    jnz  .main_loop_end
+    push g_game_state
+    call draw_game_state_diff
+    add  sp, 2
 
-    ; No space/arrows = next frame
-    xor  al, al
-    or   al, byte [si+CONTROLS_STATE_OFF_LEFT]
-    or   al, byte [si+CONTROLS_STATE_OFF_RIGHT]
-    or   al, byte [si+CONTROLS_STATE_OFF_ROT_RIGHT]
-    or   al, byte [si+CONTROLS_STATE_OFF_SOFT_DROP]
-    or   al, byte [si+CONTROLS_STATE_OFF_HARD_DROP]
-    test al, KEYBOARD_STATE_MASK_WAS_PRESSED
-    jz   .skip_everything
-
-    ; Delete old tetrimino
-    push tetrimino_buffer
-    call delete_matrix_tetrimino
-    add sp, 2
-
-    ; Space = generate
-    mov  al, byte [si+CONTROLS_STATE_OFF_HARD_DROP]
-    test al, KEYBOARD_STATE_MASK_WAS_PRESSED
-    jz   .skip_generate
-
-.generate:
-    call next_mino
-    push tetrimino_buffer
-    push ax
-    call initialize_tetrimino
-    add sp, 4
-.skip_generate:
-
-
-macro do_move name, key, row, col {
-    mov  al, byte [si+CONTROLS_STATE_OFF_#key]
-    test al, KEYBOARD_STATE_MASK_WAS_PRESSED
-    jz   .skip_#name
-
-    push col
-    push row
-    push tetrimino_buffer
-    push matrix
-    call tetrimino_try_move
-    add sp, 8
-.skip_#name:
-}
-
-    do_move left  ,LEFT      , 0 ,-1
-    do_move right ,RIGHT     , 0 , 1
-    do_move up    ,ROT_RIGHT , 1 , 0
-    do_move down  ,SOFT_DROP ,-1 , 0
-
-    ; draw new tetrimino
-    push tetrimino_buffer
-    call draw_matrix_tetrimino
-    add sp, 2
-
-.skip_everything:
-    jmp .main_loop
-.main_loop_end:
-
+    show_word 20, 20, word [_dgsd_minos+(4*0)+(2*0)]
+    show_word 60, 20, word [_dgsd_minos+(4*0)+(2*1)]
+    show_word 20, 30, word [_dgsd_minos+(4*1)+(2*0)]
+    show_word 60, 30, word [_dgsd_minos+(4*1)+(2*1)]
+    show_word 20, 40, word [_dgsd_minos+(4*2)+(2*0)]
+    show_word 60, 40, word [_dgsd_minos+(4*2)+(2*1)]
+    show_word 20, 50, word [_dgsd_minos+(4*3)+(2*0)]
+    show_word 60, 50, word [_dgsd_minos+(4*3)+(2*1)]
+    
 .teardown:
     call restore_int_09h
     ; exit 0
@@ -107,7 +68,6 @@ macro do_move name, key, row, col {
     int 21h
 
 
-tetrimino_buffer: times TETRIMINO_SIZE db 0
 word_str_buffer: db 0,0,0,0,0
 
 include 'input/time.inc'
@@ -119,27 +79,10 @@ include 'misc.inc'
 include 'logic/prng.inc'
 include 'logic/tetrimino_generation.inc'
 include 'logic/tetrimino_movement.inc'
+include 'logic/state_machine.inc'
 
-; appears upside-down
-matrix db \
-    1,1,1,1,1,1,1,1,1,1, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    2,4,4,4,0,0,0,0,0,2, \
-    2,0,0,0,0,0,0,0,0,2, \
-    3,0,0,0,0,0,0,0,0,3, \
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+
+g_game_state: times GAME_STATE_SIZE db 0
+g_matrix: times MATRIX_H*MATRIX_W db 0
+g_tetrimino: times TETRIMINO_SIZE db 0
