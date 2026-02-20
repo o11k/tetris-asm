@@ -6,12 +6,11 @@ macro _tetrimino_get_coords_single index {
 
     xor  cx, cx
 
-    mov  cl, ah
-    mov  word [si+0], cx
     mov  cl, al
+    mov  word [si+0], cx
+    mov  cl, ah
     mov  word [si+2], cx
 }
-
 ; void tetrimino_get_coords(Tetrimino *t, word[2][4] *buffer)
 tetrimino_get_coords:
     push bp

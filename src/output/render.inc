@@ -212,9 +212,9 @@ draw_borders:
 
 macro _draw_matrix_tetrimino_single index {
     mov ax, word [_draw_matrix_tetrimino_coords_buffer+(index*4)+0]
-    mov word [bp-4], ax
-    mov ax, word [_draw_matrix_tetrimino_coords_buffer+(index*4)+2]
     mov word [bp-6], ax
+    mov ax, word [_draw_matrix_tetrimino_coords_buffer+(index*4)+2]
+    mov word [bp-4], ax
     call draw_matrix_block
 }
 _draw_matrix_tetrimino_coords_buffer: times 2*4 dw 0
@@ -236,8 +236,8 @@ draw_matrix_tetrimino:
     mov cl, byte [si+TETRIMINO_OFF_TYPE]
 
     ; push initial
-    push 0  ; [bp-2] = col
-    push 0  ; [bp-4] = row
+    push 0  ; [bp-4] = col
+    push 0  ; [bp-6] = row
     push cx ; type
 
     _draw_matrix_tetrimino_single 0
