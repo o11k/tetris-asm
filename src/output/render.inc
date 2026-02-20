@@ -252,3 +252,26 @@ draw_matrix_tetrimino:
     pop si
     pop bp
     ret
+
+
+; void delete_matrix_tetrimino(Tetrimino *t)
+delete_matrix_tetrimino:
+    push bp
+    mov  bp, sp
+    push bx
+    push si
+
+    mov si, [bp+4]
+    mov bl, byte [si+TETRIMINO_OFF_TYPE]
+    mov byte [si+TETRIMINO_OFF_TYPE], MINO_NONE
+
+    push word [bp+4]
+    call draw_matrix_tetrimino
+    add  sp, 2
+
+    mov byte [si+TETRIMINO_OFF_TYPE], bl
+
+    pop si
+    pop bx
+    pop bp
+    ret
