@@ -51,6 +51,14 @@ advance_game_state:
     jnz .initially_on_ground
 
     mov ax, word [bp+6]  ; delta_time
+    mov si, word [bp+8]  ; kb_state
+    test byte [si+CONTROLS_STATE_OFF_SOFT_DROP], KEYBOARD_STATE_MASK_IS_DOWN
+    jz .no_soft_drop
+
+    mov cl, CONSTANT_SOFT_DROP_SPEEDUP
+    mul cl
+
+.no_soft_drop:
     sub word [bx+GAME_STATE_OFF_TIMER_FALL], ax
     jnc .loop_fall_end
 
