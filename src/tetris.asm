@@ -36,12 +36,19 @@ start:
     call prng_seed
     add sp, 2
 
+    
 .main:
     call draw_borders
 
-    push time_state
+    push g_time_state
     call get_time_delta
     add sp, 2
+
+    push g_tetrimino
+    push g_matrix
+    push g_game_state
+    call initialize_game_state
+    add  sp, 6
 
 .main_loop:
     call get_controls_state
@@ -51,15 +58,19 @@ start:
     test byte [bx+CONTROLS_STATE_OFF_PAUSE], KEYBOARD_STATE_MASK_WAS_PRESSED
     jnz  .main_loop_end
 
-    push time_state
+    push g_time_state
     call get_time_delta
     add sp, 2
 
-    test ax, ax
-    jz .skip_show
+    push bx
+    push ax
+    push g_game_state
+    call advance_game_state
+    add sp, 6
 
-    show_word 20, 20, ax
-.skip_show:
+    push g_game_state
+    call draw_game_state_diff
+    add  sp, 2
 
     jmp .main_loop
 .main_loop_end:
@@ -71,7 +82,6 @@ start:
     int 21h
 
 
-time_state: dw 0,0,0,0
 
 word_str_buffer: db 0,0,0,0,0
 
@@ -87,7 +97,7 @@ include 'logic/tetrimino_movement.inc'
 include 'logic/state_machine.inc'
 
 
-
 g_game_state: times GAME_STATE_SIZE db 0
 g_matrix: times MATRIX_H*MATRIX_W db 0
 g_tetrimino: times TETRIMINO_SIZE db 0
+g_time_state: dw 0,0,0,0

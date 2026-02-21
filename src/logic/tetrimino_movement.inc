@@ -1,15 +1,18 @@
 macro _tetrimino_get_coords_single index {
-    mov al, byte [bx+TETRIMINO_OFF_ROOT +0]
-    add al, byte [bx+TETRIMINO_OFF_MINOS+0+(index*2)]
-    mov ah, byte [bx+TETRIMINO_OFF_ROOT +1]
-    add ah, byte [bx+TETRIMINO_OFF_MINOS+1+(index*2)]
+    mov cl, byte [bx+TETRIMINO_OFF_ROOT +0]
+    add cl, byte [bx+TETRIMINO_OFF_MINOS+0+(index*2)]
+    mov ch, byte [bx+TETRIMINO_OFF_ROOT +1]
+    add ch, byte [bx+TETRIMINO_OFF_MINOS+1+(index*2)]
 
-    xor  cx, cx
+    xor ax, ax
+    mov al, cl
+    cbw
+    mov word [si+0], ax
 
-    mov  cl, al
-    mov  word [si+0], cx
-    mov  cl, ah
-    mov  word [si+2], cx
+    xor ax, ax
+    mov al, ch
+    cbw
+    mov word [si+2], ax
 }
 ; void tetrimino_get_coords(Tetrimino *t, word[2][4] *buffer)
 tetrimino_get_coords:
@@ -35,22 +38,13 @@ tetrimino_get_coords:
     ret
 
 
-macro _tetrimino_detect_collision_single index {
-    mov ax, word [_tetrimino_detect_collision_coords_buffer+(index*4)+0]
-    mov word [bp-4], ax
-    mov ax, word [_tetrimino_detect_collision_coords_buffer+(index*4)+2]
-    mov word [bp-2], ax
-    call mino_detect_collision
-    test ax, ax
-    jnz .found
-}
-_tetrimino_detect_collision_coords_buffer: times 2*4 dw 0
+_tdc_coords_buffer: times 2*4 dw 0
 ; bool tetrimino_detect_collision(Matrix *m, Tetrimino *t)
 tetrimino_detect_collision:
     push bp
     mov  bp, sp
 
-    push _tetrimino_detect_collision_coords_buffer
+    push _tdc_coords_buffer
     push word [bp+6]
     call tetrimino_get_coords
     add  sp, 4
@@ -59,10 +53,19 @@ tetrimino_detect_collision:
     push 0  ; [bp-4] = row
     push word [bp+4]  ; matrix
 
-    _tetrimino_detect_collision_single 0
-    _tetrimino_detect_collision_single 1
-    _tetrimino_detect_collision_single 2
-    _tetrimino_detect_collision_single 3
+macro _tdc_single index {
+    mov ax, word [_tdc_coords_buffer+(index*4)+0]
+    mov word [bp-4], ax
+    mov ax, word [_tdc_coords_buffer+(index*4)+2]
+    mov word [bp-2], ax
+    call mino_detect_collision
+    test ax, ax
+    jnz .found
+}
+    _tdc_single 0
+    _tdc_single 1
+    _tdc_single 2
+    _tdc_single 3
 
 .not_found:
     mov  ax, 0
@@ -158,8 +161,6 @@ tetrimino_is_on_ground:
     add sp, 4
 
     inc byte [bx+TETRIMINO_OFF_ROOT+0]
-
-    xor ax, 1
 
     pop bx
     pop bp
