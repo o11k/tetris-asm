@@ -42,6 +42,7 @@ int_09h_scan_code: dw 0
 new_int_09h:
     push ax
     push bx
+    push cx
     push si
 
     ; si = scan code (without prefixes)
@@ -49,32 +50,35 @@ new_int_09h:
     mov si, ax
     and si, 07fh
     
-    ; bl = is key down (1=down, 0=up)
-    mov bl, al
-    and bl, 80h
-    shr bl, 7
-    xor bl, 1
+    ; cl will be the final result
+    xor cl, cl
 
-    ; al = old key state
+    ; cl & KEYBOARD_STATE_MASK_IS_DOWN =1 only if key down event
+    test al, KEYBOARD_SCAN_CODE_MASK_KEY_UP
+    jnz  .not_key_down
+    or   cl, KEYBOARD_STATE_MASK_IS_DOWN
+.not_key_down:
+
+    ; cl & KEYBOARD_STATE_MASK_WAS_PRESSED =1 only if already pressed or newly pressed
+    ; already was pressed
     mov al, byte [keyboard_state_system+si]
-
-    ; set al&2 to 1 if newly-pressed
-    test bl, 1
+    and al, KEYBOARD_STATE_MASK_WAS_PRESSED
+    or  cl, al
+    ; newly pressed
+    mov  al, byte [keyboard_state_system+si]
+    test cl, KEYBOARD_STATE_MASK_IS_DOWN
     jz   .not_newly_pressed
-    test al, 1
+    test al, KEYBOARD_STATE_MASK_IS_DOWN
     jnz  .not_newly_pressed
-    or   al, 2
+    or   cl, KEYBOARD_STATE_MASK_WAS_PRESSED
 .not_newly_pressed:
 
-    ; set al&1 to 1=down 0=up
-    and ax, 0FFFEh
-    or al, bl
-
     ; store updated state
-    mov byte [keyboard_state_system+si], al
+    mov byte [keyboard_state_system+si], cl
 
 .done:
     pop si
+    pop cx
     pop bx
     pop ax
     jmp far [old_int_09h]  ; chain old handler
@@ -89,17 +93,21 @@ get_keyboard_state:
     push si
 
     cli
-    ; for (si=127; si!=0; si--)
-    mov si, 128
+    ; for (si=0; si<128; si++)
+    xor si, si
 .loop_key:
-    dec  si
-    test si, si
-    jz   .loop_key_end
+    cmp  si, 128
+    jge  .loop_key_end
 
+    ; copy from system buffer to user buffer
     mov al, byte [keyboard_state_system+si]
     mov byte [keyboard_state_user+si], al
-    and byte [keyboard_state_system+si], 0FDh  ; unset "pressed" flag
+    ; unset "pressed" flag in system buffer
+    mov cl, KEYBOARD_STATE_MASK_WAS_PRESSED
+    not cl
+    and byte [keyboard_state_system+si], cl
 
+    inc si
     jmp .loop_key
 .loop_key_end:
     sti
@@ -109,7 +117,7 @@ get_keyboard_state:
     pop si
     ret
 
-keyboard_state_user:   db 0 dup 128
-keyboard_state_system: db 0 dup 128
+keyboard_state_user:   times 128 db 0
+keyboard_state_system: times 128 db 0
 
 include "keyboard_tables.inc"

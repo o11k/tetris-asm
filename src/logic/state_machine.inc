@@ -58,7 +58,7 @@ advance_game_state:
     test ax, ax
     jnz  .loop_hard_drop
 .loop_hard_drop_end:
-    jump .lockdown
+    jmp .lockdown
 
 .no_hard_drop:
 

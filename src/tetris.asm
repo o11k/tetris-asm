@@ -83,7 +83,7 @@ start:
 
 
 
-word_str_buffer: db 0,0,0,0,0
+word_str_buffer: times 30 db 0
 
 include 'input/time.inc'
 include 'input/keyboard_input.inc'
