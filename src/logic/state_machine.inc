@@ -39,6 +39,7 @@ advance_game_state:
     push bp
     mov  bp, sp
     push bx
+    push si
 
     mov bx, word [bp+4]  ; state
 
@@ -47,7 +48,7 @@ advance_game_state:
     call tetrimino_is_on_ground
     add sp, 4
     test ax, ax
-    jnz .on_ground
+    jnz .initially_on_ground
 
     mov ax, word [bp+6]  ; delta_time
     sub word [bx+GAME_STATE_OFF_TIMER_FALL], ax
@@ -68,9 +69,49 @@ advance_game_state:
     js .loop_fall
 .loop_fall_end:
 
-.on_ground:
+.initially_on_ground:
 
+    ; if tetrimino.row < lowest_row
+    mov si, word [bx+GAME_STATE_OFF_TETRIMINO]
+    mov al, byte [si+TETRIMINO_OFF_ROOT+0]
+    mov ah, byte [bx+GAME_STATE_OFF_LOWEST_ROW]
+    cmp al, ah
+    jge .not_lowest_row
 
+    mov byte [bx+GAME_STATE_OFF_LOWEST_ROW], al
+    mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
+
+.not_lowest_row:
+
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    call tetrimino_is_on_ground
+    add sp, 4
+    test ax, ax
+    jz  .not_on_ground
+
+    ; TODO don't do this if initially not on ground
+    mov ax, word [bp+6]  ; delta_time
+    sub word [bx+GAME_STATE_OFF_TIMER_LOCK], ax
+    jc  .no_lockdown
+
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    call tetrimino_lock_down
+    add sp, 4
+
+    ; TODO start timer to generate - not immediately
+    call next_mino
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push ax
+    call initialize_tetrimino
+    add sp, 4
+
+.no_lockdown:
+
+.not_on_ground:
+
+    pop si
     pop bx
     pop bp
     ret

@@ -165,3 +165,43 @@ tetrimino_is_on_ground:
     pop bx
     pop bp
     ret
+
+; TODO: DRY with draw_game_state_diff?
+_tld_minos: times 2*4 dw 0
+; void tetrimino_lock_down(Matrix *m, Tetrimino *t)
+tetrimino_lock_down:
+    push bp
+    mov  bp, sp
+    push bx
+    push si
+
+    ; Tetrimino to concrete (row,col)s
+    push _tld_minos
+    push word [bp+6]  ; tetrimino
+    call tetrimino_get_coords
+    add sp, 4
+
+    ; dl = mino type
+    mov si, word [bp+6]  ; tetrimino
+    mov dl, byte [si+TETRIMINO_OFF_TYPE]
+
+
+    ; Copy tetrimino to matrix
+    mov bx, word [bp+4]  ; matrix
+    mov cl, MATRIX_W
+macro _tld_mino_to_frame index {
+    mov ax, word [_tld_minos+(index*4)+0]
+    mul cl
+    add ax, word [_tld_minos+(index*4)+2]
+    mov si, ax
+    mov byte [bx+si], dl
+}
+    _tld_mino_to_frame 0
+    _tld_mino_to_frame 1
+    _tld_mino_to_frame 2
+    _tld_mino_to_frame 3
+
+    pop si
+    pop bx
+    pop bp
+    ret
