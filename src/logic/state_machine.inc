@@ -43,6 +43,25 @@ advance_game_state:
 
     mov bx, word [bp+4]  ; state
 
+    mov si, word [bp+8]  ; kb_state
+    test byte [si+CONTROLS_STATE_OFF_HARD_DROP], KEYBOARD_STATE_MASK_WAS_PRESSED
+    jz  .no_hard_drop
+
+.loop_hard_drop:
+    push 0
+    push -1
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    call tetrimino_try_move
+    add sp, 8
+
+    test ax, ax
+    jnz  .loop_hard_drop
+.loop_hard_drop_end:
+    jump .lockdown
+
+.no_hard_drop:
+
     push word [bx+GAME_STATE_OFF_TETRIMINO]
     push word [bx+GAME_STATE_OFF_MATRIX]
     call tetrimino_is_on_ground
@@ -50,15 +69,15 @@ advance_game_state:
     test ax, ax
     jnz .initially_on_ground
 
+    ; Soft drop
     mov ax, word [bp+6]  ; delta_time
     mov si, word [bp+8]  ; kb_state
     test byte [si+CONTROLS_STATE_OFF_SOFT_DROP], KEYBOARD_STATE_MASK_IS_DOWN
     jz .no_soft_drop
-
     mov cl, CONSTANT_SOFT_DROP_SPEEDUP
     mul cl
-
 .no_soft_drop:
+
     sub word [bx+GAME_STATE_OFF_TIMER_FALL], ax
     jnc .loop_fall_end
 
@@ -103,6 +122,7 @@ advance_game_state:
     sub word [bx+GAME_STATE_OFF_TIMER_LOCK], ax
     jc  .no_lockdown
 
+.lockdown:
     push word [bx+GAME_STATE_OFF_TETRIMINO]
     push word [bx+GAME_STATE_OFF_MATRIX]
     call tetrimino_lock_down
