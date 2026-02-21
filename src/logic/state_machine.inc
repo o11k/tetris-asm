@@ -107,8 +107,30 @@ advance_game_state:
 
     mov byte [bx+GAME_STATE_OFF_LOWEST_ROW], al
     mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
-
 .not_lowest_row:
+
+    mov si, word [bp+8]  ; kb_state
+    test byte [si+CONTROLS_STATE_OFF_LEFT], KEYBOARD_STATE_MASK_WAS_PRESSED
+    jz .no_left
+    push -1
+    push 0
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    call tetrimino_try_move
+    add sp, 8
+.no_left:
+
+    mov si, word [bp+8]  ; kb_state
+    test byte [si+CONTROLS_STATE_OFF_RIGHT], KEYBOARD_STATE_MASK_WAS_PRESSED
+    jz .no_right
+    push 1
+    push 0
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    call tetrimino_try_move
+    add sp, 8
+.no_right:
+
 
     push word [bx+GAME_STATE_OFF_TETRIMINO]
     push word [bx+GAME_STATE_OFF_MATRIX]
