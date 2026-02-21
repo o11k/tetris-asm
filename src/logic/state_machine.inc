@@ -142,7 +142,7 @@ advance_game_state:
     ; TODO don't do this if initially not on ground
     mov ax, word [bp+6]  ; delta_time
     sub word [bx+GAME_STATE_OFF_TIMER_LOCK], ax
-    jc  .no_lockdown
+    jnc .no_lockdown
 
 .lockdown:
     push word [bx+GAME_STATE_OFF_TETRIMINO]
@@ -156,6 +156,9 @@ advance_game_state:
     push ax
     call initialize_tetrimino
     add sp, 4
+
+    mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
+    mov word [bx+GAME_STATE_OFF_TIMER_FALL], CONSTANT_FALL_TIME
 
 .no_lockdown:
 
