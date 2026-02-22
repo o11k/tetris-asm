@@ -73,6 +73,20 @@ new_int_09h:
     or   cl, KEYBOARD_STATE_MASK_WAS_PRESSED
 .not_newly_pressed:
 
+    ; cl & KEYBOARD_STATE_MASK_WAS_RELEASED =1 only if already released or newly released
+    ; already was released
+    mov al, byte [keyboard_state_system+si]
+    and al, KEYBOARD_STATE_MASK_WAS_RELEASED
+    or  cl, al
+    ; newly released
+    mov  al, byte [keyboard_state_system+si]
+    test cl, KEYBOARD_STATE_MASK_IS_DOWN
+    jnz  .not_newly_released
+    test al, KEYBOARD_STATE_MASK_IS_DOWN
+    jz   .not_newly_released
+    or   cl, KEYBOARD_STATE_MASK_WAS_RELEASED
+.not_newly_released:
+
     ; store updated state
     mov byte [keyboard_state_system+si], cl
 
@@ -102,8 +116,9 @@ get_keyboard_state:
     ; copy from system buffer to user buffer
     mov al, byte [keyboard_state_system+si]
     mov byte [keyboard_state_user+si], al
-    ; unset "pressed" flag in system buffer
+    ; unset "pressed" and "released" flags in system buffer
     mov cl, KEYBOARD_STATE_MASK_WAS_PRESSED
+    or  cl, KEYBOARD_STATE_MASK_WAS_RELEASED
     not cl
     and byte [keyboard_state_system+si], cl
 

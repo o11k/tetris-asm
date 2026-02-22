@@ -25,6 +25,10 @@ initialize_game_state:
     mov ax, word [bp+8]  ; tetrimino
     mov word [bx+GAME_STATE_OFF_TETRIMINO], ax
 
+    mov word [bx+GAME_STATE_OFF_TIMER_GEN], 0
+    mov word [bx+GAME_STATE_OFF_TIMER_REPEAT], 0
+    mov word [bx+GAME_STATE_OFF_TIMER_REPEAT_KICK_IN], 0
+
     mov word [bx+GAME_STATE_OFF_TIMER_FALL], CONSTANT_FALL_TIME
     mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
 
@@ -33,6 +37,16 @@ initialize_game_state:
     pop bx
     pop bp
     ret
+
+
+macro _state_machine_try_move row, col {
+    push col
+    push row
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    call tetrimino_try_move
+    add sp, 8
+}
 
 ; void advance(State *state, dword delta_time, KeyboardState *kb_state)
 advance_game_state:
@@ -43,17 +57,30 @@ advance_game_state:
 
     mov bx, word [bp+4]  ; state
 
+    test word [bx+GAME_STATE_OFF_TIMER_GEN], 0xFFFF
+    jz   .no_generation_phase
+
+    mov ax, word [bp+6]  ; delta_time
+    sub word [bx+GAME_STATE_OFF_TIMER_GEN], ax
+    ja  .no_generation_yet
+
+    mov word [bx+GAME_STATE_OFF_TIMER_GEN], 0
+    call next_mino
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push ax
+    call initialize_tetrimino
+    add sp, 4
+
+.no_generation_yet:
+    jmp .cleanup
+.no_generation_phase:
+
     mov si, word [bp+8]  ; kb_state
     test byte [si+CONTROLS_STATE_OFF_HARD_DROP], KEYBOARD_STATE_MASK_WAS_PRESSED
     jz  .no_hard_drop
 
 .loop_hard_drop:
-    push 0
-    push -1
-    push word [bx+GAME_STATE_OFF_TETRIMINO]
-    push word [bx+GAME_STATE_OFF_MATRIX]
-    call tetrimino_try_move
-    add sp, 8
+    _state_machine_try_move -1, 0
 
     test ax, ax
     jnz  .loop_hard_drop
@@ -82,13 +109,7 @@ advance_game_state:
     jnc .loop_fall_end
 
 .loop_fall:
-    ; try_fall()
-    push 0
-    push -1
-    push word [bx+GAME_STATE_OFF_TETRIMINO]
-    push word [bx+GAME_STATE_OFF_MATRIX]
-    call tetrimino_try_move
-    add sp, 8
+    _state_machine_try_move -1, 0
 
     ; timer_fall += FALL_TIME
     add word [bx+GAME_STATE_OFF_TIMER_FALL], CONSTANT_FALL_TIME
@@ -109,29 +130,12 @@ advance_game_state:
     mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
 .not_lowest_row:
 
-    mov si, word [bp+8]  ; kb_state
-    test byte [si+CONTROLS_STATE_OFF_LEFT], KEYBOARD_STATE_MASK_WAS_PRESSED
-    jz .no_left
-    push -1
-    push 0
-    push word [bx+GAME_STATE_OFF_TETRIMINO]
-    push word [bx+GAME_STATE_OFF_MATRIX]
-    call tetrimino_try_move
-    add sp, 8
-.no_left:
-
-    mov si, word [bp+8]  ; kb_state
-    test byte [si+CONTROLS_STATE_OFF_RIGHT], KEYBOARD_STATE_MASK_WAS_PRESSED
-    jz .no_right
-    push 1
-    push 0
-    push word [bx+GAME_STATE_OFF_TETRIMINO]
-    push word [bx+GAME_STATE_OFF_MATRIX]
-    call tetrimino_try_move
-    add sp, 8
-.no_right:
-
-
+    push word [bp+8]
+    push word [bp+6]
+    push word [bp+4]
+    call advance_game_state__side_to_side
+    add sp, 6
+    
     push word [bx+GAME_STATE_OFF_TETRIMINO]
     push word [bx+GAME_STATE_OFF_MATRIX]
     call tetrimino_is_on_ground
@@ -150,19 +154,163 @@ advance_game_state:
     call tetrimino_lock_down
     add sp, 4
 
-    ; TODO start timer to generate - not immediately
-    call next_mino
-    push word [bx+GAME_STATE_OFF_TETRIMINO]
-    push ax
-    call initialize_tetrimino
-    add sp, 4
-
+    mov word [bx+GAME_STATE_OFF_TIMER_GEN],  CONSTANT_GEN_TIME
     mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
     mov word [bx+GAME_STATE_OFF_TIMER_FALL], CONSTANT_FALL_TIME
 
 .no_lockdown:
 
 .not_on_ground:
+
+.cleanup:
+
+    pop si
+    pop bx
+    pop bp
+    ret
+
+
+; void advance(State *state, dword delta_time, KeyboardState *kb_state)
+advance_game_state__side_to_side:
+    push bp
+    mov  bp, sp
+    push bx
+    push si
+
+    mov bx, word [bp+4]  ; state
+    mov si, word [bp+8]  ; kb_state
+
+    ; cx = last direction
+    mov cx, word [bx+GAME_STATE_OFF_FLAGS]
+    and cx, GAME_STATE_FLAGS_MASK_DIR
+
+    ; === RESOLVE CURRENT DIRECTION ===
+
+    ; if (left.is_down && right.is_down) {
+    ;   if (left.was_pressed) {...}
+    ;   else if (right.was_pressed) {...}
+    ;   else {...}
+    ;}
+    ; else if (left.is_down) {...}
+    ; else if (right.is_down) {...}
+    ; else {...}
+
+    test byte [si+CONTROLS_STATE_OFF_LEFT], KEYBOARD_STATE_MASK_IS_DOWN
+    jz   .resolve_check_elif
+    test byte [si+CONTROLS_STATE_OFF_RIGHT], KEYBOARD_STATE_MASK_IS_DOWN
+    jnz  .resolve_if_both
+.resolve_check_elif:
+    test byte [si+CONTROLS_STATE_OFF_LEFT], KEYBOARD_STATE_MASK_IS_DOWN
+    jnz  .resolve_elif_left
+    test byte [si+CONTROLS_STATE_OFF_RIGHT], KEYBOARD_STATE_MASK_IS_DOWN
+    jnz  .resolve_elif_right
+    jmp  .resolve_else
+
+.resolve_if_both:
+    test byte [si+CONTROLS_STATE_OFF_LEFT], KEYBOARD_STATE_MASK_WAS_PRESSED
+    jnz  .resolve_if_both_if_left
+    test byte [si+CONTROLS_STATE_OFF_RIGHT], KEYBOARD_STATE_MASK_WAS_PRESSED
+    jnz  .resolve_if_both_if_right
+    jmp  .resolve_if_both_else
+
+.resolve_if_both_if_left:
+    mov ax, GAME_STATE_FLAGS_MASK_DIR_LEFT
+    jmp .resolve_if_both_endif
+.resolve_if_both_if_right:
+    mov ax, GAME_STATE_FLAGS_MASK_DIR_RIGHT
+    jmp .resolve_if_both_endif
+.resolve_if_both_else:
+    mov ax, cx
+    jmp .resolve_if_both_endif
+.resolve_if_both_endif:
+    
+    jmp .resolve_endif
+.resolve_elif_left:
+    mov ax, GAME_STATE_FLAGS_MASK_DIR_LEFT
+    jmp .resolve_endif
+.resolve_elif_right:
+    mov ax, GAME_STATE_FLAGS_MASK_DIR_RIGHT
+    jmp .resolve_endif
+.resolve_else:
+    mov ax, 0
+    jmp .resolve_endif
+.resolve_endif:
+
+    ; state.direction = new direction
+    mov dx, GAME_STATE_FLAGS_MASK_DIR
+    not dx
+    and word [bx+GAME_STATE_OFF_FLAGS], dx
+    or  word [bx+GAME_STATE_OFF_FLAGS], ax
+
+    ; === TAP MOVEMENT ===
+    test byte [si+CONTROLS_STATE_OFF_LEFT], KEYBOARD_STATE_MASK_WAS_PRESSED
+    jz   .no_tap_left
+
+    _state_machine_try_move 0, -1
+    mov word [bx+GAME_STATE_OFF_TIMER_REPEAT_KICK_IN], CONSTANT_AUTOREPEAT_KICK_IN_TIME
+    mov word [bx+GAME_STATE_OFF_TIMER_REPEAT], 0
+
+.no_tap_left:
+    test byte [si+CONTROLS_STATE_OFF_RIGHT], KEYBOARD_STATE_MASK_WAS_PRESSED
+    jz   .no_tap_right
+
+    _state_machine_try_move 0, 1
+    mov word [bx+GAME_STATE_OFF_TIMER_REPEAT_KICK_IN], CONSTANT_AUTOREPEAT_KICK_IN_TIME
+    mov word [bx+GAME_STATE_OFF_TIMER_REPEAT], 0
+
+.no_tap_right:
+
+    ; === NO DIRECTION HELD ===
+    test ax, ax
+    jnz  .direction_held
+
+    mov word [bx+GAME_STATE_OFF_TIMER_REPEAT_KICK_IN], 0
+    mov word [bx+GAME_STATE_OFF_TIMER_REPEAT], 0
+    jmp .return
+.direction_held:
+
+    ; === DIRECTION CHANGED WHILE HELD ===
+    cmp cx, ax
+    je  .direction_not_changed
+
+    mov word [bx+GAME_STATE_OFF_TIMER_REPEAT_KICK_IN], CONSTANT_AUTOREPEAT_KICK_IN_TIME
+    mov word [bx+GAME_STATE_OFF_TIMER_REPEAT], 0
+
+.direction_not_changed:
+
+    ; === DELAY PHASE ===
+    cmp word [bx+GAME_STATE_OFF_TIMER_REPEAT_KICK_IN], 0
+    jz  .no_delay
+
+    mov dx, word [bp+6]  ; delta_time
+    sub word [bx+GAME_STATE_OFF_TIMER_REPEAT_KICK_IN], dx
+    jnc .delay_not_over
+    mov word [bx+GAME_STATE_OFF_TIMER_REPEAT_KICK_IN], 0
+
+.delay_not_over:
+    jmp .return
+
+.no_delay:
+
+    ; === REPEAT PHASE ===
+    mov dx, word [bp+6]  ; delta_time
+    sub word [bx+GAME_STATE_OFF_TIMER_REPEAT], dx
+    jg  .repeat_timer_not_over
+
+    add word [bx+GAME_STATE_OFF_TIMER_REPEAT], CONSTANT_AUTOREPEAT_TIME
+
+    cmp ax, GAME_STATE_FLAGS_MASK_DIR_RIGHT
+    je  .repeat_right
+.repeat_left:
+    _state_machine_try_move 0, -1
+    jmp .repeat_endif
+.repeat_right:
+    _state_machine_try_move 0, 1
+.repeat_endif:
+
+.repeat_timer_not_over:
+
+.return:
 
     pop si
     pop bx

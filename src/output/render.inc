@@ -58,6 +58,7 @@ draw_block:
     pop bp
     ret
 
+; TODO draw grid dot if MINO_NONE (?)
 ; void draw_matrix_block(Mino mino, word row, word col)
 draw_matrix_block:
     push bp
@@ -237,6 +238,7 @@ _dgsd_last_frame: times MATRIX_W*MATRIX_H db MINO_NONE
 _dgsd_curr_frame: times MATRIX_W*MATRIX_H db 0
 _dgsd_minos: times 2*4 dw 0
 
+; TODO only draw visible
 ; void draw_game_state_diff(State *state)
 draw_game_state_diff:
     push bp
