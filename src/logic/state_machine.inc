@@ -1,5 +1,14 @@
 ; Not a pure state machine - uses randomness
 
+macro _state_machine_try_move row, col {
+    push col
+    push row
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    call tetrimino_try_move
+    add sp, 8
+}
+
 ; void initialize_game_state(State *state, Matrix *m, Tetrimino *t)
 initialize_game_state:
     push bp
@@ -24,6 +33,7 @@ initialize_game_state:
     mov word [bx+GAME_STATE_OFF_MATRIX], ax
     mov ax, word [bp+8]  ; tetrimino
     mov word [bx+GAME_STATE_OFF_TETRIMINO], ax
+    _state_machine_try_move -1, 0
 
     mov word [bx+GAME_STATE_OFF_TIMER_GEN], 0
     mov word [bx+GAME_STATE_OFF_TIMER_REPEAT], 0
@@ -37,16 +47,6 @@ initialize_game_state:
     pop bx
     pop bp
     ret
-
-
-macro _state_machine_try_move row, col {
-    push col
-    push row
-    push word [bx+GAME_STATE_OFF_TETRIMINO]
-    push word [bx+GAME_STATE_OFF_MATRIX]
-    call tetrimino_try_move
-    add sp, 8
-}
 
 ; void advance(State *state, dword delta_time, KeyboardState *kb_state)
 advance_game_state:
@@ -70,6 +70,8 @@ advance_game_state:
     push ax
     call initialize_tetrimino
     add sp, 4
+
+    _state_machine_try_move -1, 0
 
 .no_generation_yet:
     jmp .cleanup
