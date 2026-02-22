@@ -205,3 +205,92 @@ macro _tld_mino_to_frame index {
     pop bx
     pop bp
     ret
+
+
+; void tetrimino_visual_rotate(Tetrimino *t, word rot_direction)
+tetrimino_visual_rotate:
+    push bp
+    mov  bp, sp
+    push si
+
+    mov si, word [bp+4]  ; tetrimino
+    mov cx, word [bp+6]  ; direction
+    and cx, 3
+    mov dl, byte [si+TETRIMINO_OFF_SIZE]
+
+
+.rotate_loop:
+    sub cx, 1
+    jc  .rotate_loop_end
+
+    inc byte [si+TETRIMINO_OFF_ROT]
+    and byte [si+TETRIMINO_OFF_ROT], 3
+
+macro _rotate_mino_clockwise index {
+    ; (new_row, new_col) = (old_col, size-1-old_row)
+    mov al, byte [si+TETRIMINO_OFF_MINOS+(2*index)+0] ; row
+    mov ah, byte [si+TETRIMINO_OFF_MINOS+(2*index)+1] ; col
+    neg ah
+    dec ah
+    add ah, dl
+    mov byte [si+TETRIMINO_OFF_MINOS+(2*index)+0], ah
+    mov byte [si+TETRIMINO_OFF_MINOS+(2*index)+1], al
+}
+    _rotate_mino_clockwise 0
+    _rotate_mino_clockwise 1
+    _rotate_mino_clockwise 2
+    _rotate_mino_clockwise 3
+
+    jmp .rotate_loop
+.rotate_loop_end:
+
+.return:
+    pop si
+    pop bp
+    ret
+
+; bool tetrimino_try_rotate(Matrix *m, Tetrimino *t, word rot_direction)
+; rot_direction & 3: 1=right, 3=left
+; returns: 0=failure, other=point number
+tetrimino_try_rotate:
+    push bp
+    mov  bp, sp
+    push si
+
+    mov si, word [bp+6]  ; tetrimino
+    cmp byte [si+TETRIMINO_OFF_TYPE], MINO_O
+    jne .not_o
+    mov ax, 1
+    jmp .return
+.not_o:
+
+    ; visual rotate
+    push word [bp+8]  ; rot_direction
+    push word [bp+6]  ; tetrimino
+    call tetrimino_visual_rotate
+    add sp, 4
+
+    ; if no collide, return 1
+    push word [bp+6]  ; tetrimino
+    push word [bp+4]  ; matrix
+    call tetrimino_detect_collision
+    add sp, 4
+
+    test ax, ax
+    mov  ax, 1
+    jz   .return
+
+    ; if collide, undo rotation, return 0
+    mov ax, word [bp+8]  ; rot_direction
+    add ax, 2
+    push ax
+    push word [bp+6]     ; tetrimino
+    call tetrimino_visual_rotate
+    add sp, 4
+
+    mov ax, 0
+
+.return:
+    pop si
+    pop bp
+    ret

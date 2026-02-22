@@ -9,6 +9,14 @@ macro _state_machine_try_move row, col {
     add sp, 8
 }
 
+macro _state_machine_try_rotate direction {
+    push direction
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    call tetrimino_try_rotate
+    add sp, 6
+}
+
 ; void initialize_game_state(State *state, Matrix *m, Tetrimino *t)
 initialize_game_state:
     push bp
@@ -57,6 +65,7 @@ advance_game_state:
 
     mov bx, word [bp+4]  ; state
 
+; ========== GENERATION PHASE ==========
     test word [bx+GAME_STATE_OFF_TIMER_GEN], 0xFFFF
     jz   .no_generation_phase
 
@@ -77,6 +86,8 @@ advance_game_state:
     jmp .cleanup
 .no_generation_phase:
 
+; ========== HARD DROP ==========
+
     mov si, word [bp+8]  ; kb_state
     test byte [si+CONTROLS_STATE_OFF_HARD_DROP], KEYBOARD_STATE_MASK_WAS_PRESSED
     jz  .no_hard_drop
@@ -90,6 +101,30 @@ advance_game_state:
     jmp .lockdown
 
 .no_hard_drop:
+
+; ========== SIDE-TO-SIDE MOVEMENT ==========
+
+    push word [bp+8]
+    push word [bp+6]
+    push word [bp+4]
+    call advance_game_state__side_to_side
+    add sp, 6
+
+; ========== ROTATION ==========
+
+    mov si, word [bp+8]  ; kb_state
+
+    test byte [si+CONTROLS_STATE_OFF_ROT_LEFT], KEYBOARD_STATE_MASK_WAS_PRESSED
+    jz   .no_rotate_left
+    _state_machine_try_rotate 3
+.no_rotate_left:
+
+    test byte [si+CONTROLS_STATE_OFF_ROT_RIGHT], KEYBOARD_STATE_MASK_WAS_PRESSED
+    jz   .no_rotate_right
+    _state_machine_try_rotate 1
+.no_rotate_right:
+
+; ========== FALLING / SOFT DROP ==========
 
     push word [bx+GAME_STATE_OFF_TETRIMINO]
     push word [bx+GAME_STATE_OFF_MATRIX]
@@ -131,13 +166,9 @@ advance_game_state:
     mov byte [bx+GAME_STATE_OFF_LOWEST_ROW], al
     mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
 .not_lowest_row:
-
-    push word [bp+8]
-    push word [bp+6]
-    push word [bp+4]
-    call advance_game_state__side_to_side
-    add sp, 6
     
+; ========== LOCKDOWN ==========
+
     push word [bx+GAME_STATE_OFF_TETRIMINO]
     push word [bx+GAME_STATE_OFF_MATRIX]
     call tetrimino_is_on_ground
