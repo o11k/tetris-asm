@@ -13,6 +13,8 @@ MATRIX_TOP    EQU MATRIX_ORIGIN_Y - (BLOCK_SIZE*VISIBLE_MATRIX_H)
 MATRIX_LEFT   EQU MATRIX_ORIGIN_X
 MATRIX_RIGHT  EQU MATRIX_ORIGIN_X + (BLOCK_SIZE*MATRIX_W)
 
+GRID_DOT_COLOR EQU 014h
+
 BORDER_WIDTH EQU 1
 BORDER_COLOR EQU 0Fh  ; white
 
@@ -58,31 +60,54 @@ draw_block:
     pop bp
     ret
 
-; TODO draw grid dot if MINO_NONE (?)
 ; void draw_matrix_block(Mino mino, word row, word col)
 draw_matrix_block:
     push bp
     mov  bp, sp
+    push bx
+    push si
+    push di
 
-    ;y = origin_y - block_size - block_size*row
+    ;y = si = origin_y - block_size - block_size*row
     mov ax, BLOCK_SIZE
     mul word [bp+6]
     add ax, BLOCK_SIZE
     neg ax
     add ax, MATRIX_ORIGIN_Y
-    push ax
-    ;x = origin_x + block_size*col
+    mov si, ax
+    push si
+    ;x = di = origin_x + block_size*col
     mov ax, BLOCK_SIZE
     mul word [bp+8]
     add ax, MATRIX_ORIGIN_X
-    push ax
+    mov di, ax
+    push di
     ;mino
     push word [bp+4]
 
     call draw_block
     add sp, 6
 
+    cmp word [bp+4], MINO_NONE
+    jne .no_grid_dot
+    cmp word [bp+6], VISIBLE_MATRIX_H-1
+    je  .no_grid_dot
+    cmp word [bp+8], 0
+    je  .no_grid_dot
+
+    inc di
+    mov al, GRID_DOT_COLOR ; color
+    mov cx, di             ; x
+    mov dx, si             ; y
+    mov bx, 0              ; page
+    mov ah, 0Ch
+    int 10h
+.no_grid_dot:
+
 .cleanup:
+    pop di
+    pop si
+    pop bx
     pop bp
     ret
 
@@ -234,11 +259,10 @@ delete_matrix_tetrimino:
     ret
 
 
-_dgsd_last_frame: times MATRIX_W*MATRIX_H db MINO_NONE
+_dgsd_last_frame: times MATRIX_W*MATRIX_H db 0FFh
 _dgsd_curr_frame: times MATRIX_W*MATRIX_H db 0
 _dgsd_minos: times 2*4 dw 0
 
-; TODO only draw visible
 ; void draw_game_state_diff(State *state)
 draw_game_state_diff:
     push bp
@@ -282,7 +306,7 @@ macro _dgsd_mino_to_frame index {
     ; Draw diff between last and curr
     xor si, si
 .loop_diff:
-    cmp si, MATRIX_H*MATRIX_W
+    cmp si, VISIBLE_MATRIX_H*MATRIX_W
     jge .loop_diff_end
 
     mov al, byte [_dgsd_last_frame+si]
