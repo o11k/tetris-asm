@@ -18,7 +18,7 @@ GRID_DOT_COLOR EQU 014h
 BORDER_WIDTH EQU 1
 BORDER_COLOR EQU 0Fh  ; white
 
-mino_colors db 00h, 2Ah, 37h, 2Fh, 28h, 23h, 0Eh, 0Bh
+mino_colors db 00h, 2Ah, 37h, 2Fh, 28h, 23h, 0Eh, 0Bh, 14h
 ; void draw_block(Mino mino, word left_x, word top_y)
 draw_block:
     push bp
@@ -262,6 +262,7 @@ delete_matrix_tetrimino:
 _dgsd_last_frame: times MATRIX_W*MATRIX_H db 0FFh
 _dgsd_curr_frame: times MATRIX_W*MATRIX_H db 0
 _dgsd_minos: times 2*4 dw 0
+_dgsd_ghost: times TETRIMINO_SIZE dw 0
 
 ; void draw_game_state_diff(State *state)
 draw_game_state_diff:
@@ -279,18 +280,6 @@ draw_game_state_diff:
     call memcpy
     add sp, 6
 
-    ; Tetrimino to concrete (row,col)s
-    push _dgsd_minos
-    push word [bx+GAME_STATE_OFF_TETRIMINO]
-    call tetrimino_get_coords
-    add sp, 4
-
-    ; dl = mino type
-    mov si, word [bx+GAME_STATE_OFF_TETRIMINO]
-    mov dl, byte [si+TETRIMINO_OFF_TYPE]
-
-    ; Copy tetrimino to matrix
-    mov cl, MATRIX_W
 macro _dgsd_mino_to_frame index {
     mov ax, word [_dgsd_minos+(index*4)+0]
     mul cl
@@ -298,6 +287,49 @@ macro _dgsd_mino_to_frame index {
     mov si, ax
     mov byte [_dgsd_curr_frame+si], dl
 }
+
+    ; Copy ghost tetrimino to matrix
+    push TETRIMINO_SIZE
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push _dgsd_ghost
+    call memcpy
+    add sp, 6
+
+    push 0
+    push -1
+    push _dgsd_ghost
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    mov ax, 1
+.ghost_loop:
+    call tetrimino_try_move
+    test ax, ax
+    jnz  .ghost_loop
+    add  sp, 8
+.ghost_loop_end:
+
+    push _dgsd_minos
+    push _dgsd_ghost
+    call tetrimino_get_coords
+    add sp, 4
+
+    mov si, _dgsd_ghost
+    mov dl, MINO_GHOST
+    mov cl, MATRIX_W
+
+    _dgsd_mino_to_frame 0
+    _dgsd_mino_to_frame 1
+    _dgsd_mino_to_frame 2
+    _dgsd_mino_to_frame 3
+
+    ; Copy tetrimino to matrix
+    push _dgsd_minos
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    call tetrimino_get_coords
+    add sp, 4
+
+    mov si, word [bx+GAME_STATE_OFF_TETRIMINO]
+    mov dl, byte [si+TETRIMINO_OFF_TYPE]
+    mov cl, MATRIX_W
     _dgsd_mino_to_frame 0
     _dgsd_mino_to_frame 1
     _dgsd_mino_to_frame 2
