@@ -16,20 +16,13 @@ jobs:
       - name: Setup FASM
         uses: stevenwdv/setup-fasm@v1
 
-      - name: Make project
+      - name: Build project
         run: make
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Create release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: |
-            Changes in this Release
-            - First Change
-            - Second Change
-          draft: true
-          prerelease: false
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          gh release create ${{ github.ref_name }}
+          "dist/tetris.com"
+          --title "Version ${{ github.ref_name }}"
