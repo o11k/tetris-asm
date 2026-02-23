@@ -330,6 +330,7 @@ tetrimino_try_rotate:
 .srs_hit:
     mov ax, si
     shr ax, 1
+    inc ax
     jmp .return
 .srs_miss:
     add si, 2

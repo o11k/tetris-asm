@@ -1,5 +1,6 @@
 ; Not a pure state machine - uses randomness
 
+; Assumes: bx=game_state, ax can be overridden
 macro _state_machine_try_move row, col {
     push col
     push row
@@ -9,12 +10,37 @@ macro _state_machine_try_move row, col {
     add sp, 8
 }
 
+; Assumes: bx=game_state, ax can be overridden
 macro _state_machine_try_rotate direction {
     push direction
     push word [bx+GAME_STATE_OFF_TETRIMINO]
     push word [bx+GAME_STATE_OFF_MATRIX]
     call tetrimino_try_rotate
     add sp, 6
+}
+
+; Wrap try_move and try_rotate with these macros count them towards extended placement
+; Assumes: bx=game_state, ax and di can be overridden
+macro _state_machine_extended_placement_before {
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    call tetrimino_is_on_ground
+    add sp, 4
+    mov di, ax
+}
+macro _state_machine_extended_placement_after {
+    local .extended_placement
+    local .no_extended_placement
+    test di, di
+    jz   .no_extended_placement
+    test ax, ax
+    jz   .no_extended_placement
+    cmp  byte [bx+GAME_STATE_OFF_EXTENDED_PLACEMENT], 0
+    jle  .no_extended_placement
+.extended_placement:
+    dec byte [bx+GAME_STATE_OFF_EXTENDED_PLACEMENT]
+    mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
+.no_extended_placement:
 }
 
 ; void initialize_game_state(State *state, Matrix *m, Tetrimino *t)
@@ -51,17 +77,19 @@ initialize_game_state:
     mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
 
     mov byte [bx+GAME_STATE_OFF_LOWEST_ROW], 0xFF
+    mov byte [bx+GAME_STATE_OFF_EXTENDED_PLACEMENT], CONSTANT_EXTENDED_PLACEMENT
 
     pop bx
     pop bp
     ret
 
-; void advance(State *state, dword delta_time, KeyboardState *kb_state)
+; void advance_game_state(State *state, dword delta_time, KeyboardState *kb_state)
 advance_game_state:
     push bp
     mov  bp, sp
     push bx
     push si
+    push di
 
     mov bx, word [bp+4]  ; state
 
@@ -102,6 +130,19 @@ advance_game_state:
 
 .no_hard_drop:
 
+; ========== LOCK DOWN TIMER ==========
+
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    call tetrimino_is_on_ground
+    add sp, 4
+    test ax, ax
+    jz  .not_initially_on_ground
+
+    mov ax, word [bp+6]  ; delta_time
+    sub word [bx+GAME_STATE_OFF_TIMER_LOCK], ax
+.not_initially_on_ground:
+
 ; ========== SIDE-TO-SIDE MOVEMENT ==========
 
     push word [bp+8]
@@ -116,13 +157,24 @@ advance_game_state:
 
     test byte [si+CONTROLS_STATE_OFF_ROT_LEFT], KEYBOARD_STATE_MASK_WAS_PRESSED
     jz   .no_rotate_left
+    _state_machine_extended_placement_before
     _state_machine_try_rotate 3
+    _state_machine_extended_placement_after
 .no_rotate_left:
 
     test byte [si+CONTROLS_STATE_OFF_ROT_RIGHT], KEYBOARD_STATE_MASK_WAS_PRESSED
     jz   .no_rotate_right
+    _state_machine_extended_placement_before
     _state_machine_try_rotate 1
+    _state_machine_extended_placement_after
 .no_rotate_right:
+
+    test byte [si+CONTROLS_STATE_OFF_ROT_180], KEYBOARD_STATE_MASK_WAS_PRESSED
+    jz   .no_rotate_180
+    _state_machine_extended_placement_before
+    _state_machine_try_rotate 2
+    _state_machine_extended_placement_after
+.no_rotate_180:
 
 ; ========== FALLING / SOFT DROP ==========
 
@@ -164,6 +216,7 @@ advance_game_state:
     jge .not_lowest_row
 
     mov byte [bx+GAME_STATE_OFF_LOWEST_ROW], al
+    mov byte [bx+GAME_STATE_OFF_EXTENDED_PLACEMENT], CONSTANT_EXTENDED_PLACEMENT
     mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
 .not_lowest_row:
     
@@ -176,10 +229,8 @@ advance_game_state:
     test ax, ax
     jz  .not_on_ground
 
-    ; TODO don't do this if initially not on ground
-    mov ax, word [bp+6]  ; delta_time
-    sub word [bx+GAME_STATE_OFF_TIMER_LOCK], ax
-    jnc .no_lockdown
+    cmp word [bx+GAME_STATE_OFF_TIMER_LOCK], 0
+    jg  .no_lockdown
 
 .lockdown:
     push word [bx+GAME_STATE_OFF_TETRIMINO]
@@ -190,6 +241,7 @@ advance_game_state:
     mov word [bx+GAME_STATE_OFF_TIMER_GEN],  CONSTANT_GEN_TIME
     mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
     mov word [bx+GAME_STATE_OFF_TIMER_FALL], CONSTANT_FALL_TIME
+    mov word [bx+GAME_STATE_OFF_EXTENDED_PLACEMENT], CONSTANT_EXTENDED_PLACEMENT
 
 .no_lockdown:
 
@@ -197,18 +249,20 @@ advance_game_state:
 
 .cleanup:
 
+    pop di
     pop si
     pop bx
     pop bp
     ret
 
 
-; void advance(State *state, dword delta_time, KeyboardState *kb_state)
+; void advance_game_state__side_to_side(State *state, dword delta_time, KeyboardState *kb_state)
 advance_game_state__side_to_side:
     push bp
     mov  bp, sp
     push bx
     push si
+    push di
 
     mov bx, word [bp+4]  ; state
     mov si, word [bp+8]  ; kb_state
@@ -279,7 +333,10 @@ advance_game_state__side_to_side:
     test byte [si+CONTROLS_STATE_OFF_LEFT], KEYBOARD_STATE_MASK_WAS_PRESSED
     jz   .no_tap_left
 
+    _state_machine_extended_placement_before
     _state_machine_try_move 0, -1
+    _state_machine_extended_placement_after
+
     mov word [bx+GAME_STATE_OFF_TIMER_REPEAT_KICK_IN], CONSTANT_AUTOREPEAT_KICK_IN_TIME
     mov word [bx+GAME_STATE_OFF_TIMER_REPEAT], 0
 
@@ -287,7 +344,10 @@ advance_game_state__side_to_side:
     test byte [si+CONTROLS_STATE_OFF_RIGHT], KEYBOARD_STATE_MASK_WAS_PRESSED
     jz   .no_tap_right
 
+    _state_machine_extended_placement_before
     _state_machine_try_move 0, 1
+    _state_machine_extended_placement_after
+
     mov word [bx+GAME_STATE_OFF_TIMER_REPEAT_KICK_IN], CONSTANT_AUTOREPEAT_KICK_IN_TIME
     mov word [bx+GAME_STATE_OFF_TIMER_REPEAT], 0
 
@@ -335,16 +395,21 @@ advance_game_state__side_to_side:
     cmp ax, GAME_STATE_FLAGS_MASK_DIR_RIGHT
     je  .repeat_right
 .repeat_left:
+    _state_machine_extended_placement_before
     _state_machine_try_move 0, -1
+    _state_machine_extended_placement_after
     jmp .repeat_endif
 .repeat_right:
+    _state_machine_extended_placement_before
     _state_machine_try_move 0, 1
+    _state_machine_extended_placement_after
 .repeat_endif:
 
 .repeat_timer_not_over:
 
 .return:
 
+    pop di
     pop si
     pop bx
     pop bp
