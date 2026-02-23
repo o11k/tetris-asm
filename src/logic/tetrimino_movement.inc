@@ -255,8 +255,18 @@ macro _rotate_mino_clockwise index {
 tetrimino_try_rotate:
     push bp
     mov  bp, sp
+    push bx
     push si
 
+    ; if rot_direction=0, rotation is a noop
+    mov  ax, word [bp+8]  ; rot_direction
+    test ax, ax
+    jnz  .not_zero_rot
+    mov  ax, 1
+    jmp  .return
+.not_zero_rot:
+
+    ; if O tetrimino, rotate is a noop
     mov si, word [bp+6]  ; tetrimino
     cmp byte [si+TETRIMINO_OFF_TYPE], MINO_O
     jne .not_o
@@ -270,17 +280,65 @@ tetrimino_try_rotate:
     call tetrimino_visual_rotate
     add sp, 4
 
-    ; if no collide, return 1
+    ; Super Rotation System
+
+    ; select table
+    cmp byte [si+TETRIMINO_OFF_SIZE], 4
+    jne .select_srs_table_3
+
+.select_srs_table_4:
+    mov bx, srs_table_size_4
+    jmp .select_srs_table_end
+.select_srs_table_3:
+    mov bx, srs_table_size_3
+.select_srs_table_end:
+
+    ; offset table by old orientation
+    mov cx, word [bp+8]
+    and cx, 3
+    mov al, byte [si+TETRIMINO_OFF_ROT]
+    sub al, cl
+    and ax, 3
+    mov cl, SRS_TABLE_SECTION_SIZE
+    mul cl
+    add bx, ax
+
+    ; offset table by rot_direction
+    mov ax, word [bp+8]
+    and ax, 3
+    dec ax
+    mov cl, SRS_TABLE_LINE_SIZE
+    mul cl
+    add bx, ax
+
+    ; apply SRS offsets (do-while: assuming at least 1 point)
+    xor si, si
+.loop_srs:
+    xor  ax, ax
+    mov  al, byte [bx+si+1]  ; col
+    push ax
+    mov  al, byte [bx+si+0]  ; row
+    push ax
     push word [bp+6]  ; tetrimino
     push word [bp+4]  ; matrix
-    call tetrimino_detect_collision
-    add sp, 4
+    call tetrimino_try_move
+    add  sp, 8
 
     test ax, ax
-    mov  ax, 1
-    jz   .return
+    jz   .srs_miss
 
-    ; if collide, undo rotation, return 0
+.srs_hit:
+    mov ax, si
+    shr ax, 1
+    jmp .return
+.srs_miss:
+    add si, 2
+    cmp si, SRS_TABLE_LINE_SIZE
+    jl  .loop_srs
+.loop_srs_end:
+
+.srs_not_found:
+    ; undo action, return 0
     mov ax, word [bp+8]  ; rot_direction
     add ax, 2
     push ax
@@ -292,5 +350,42 @@ tetrimino_try_rotate:
 
 .return:
     pop si
+    pop bx
     pop bp
     ret
+
+; I tetrimino
+srs_table_size_4: db \
+    0, 0,  0,-2,  0, 1, -1,-2,  2, 1,  \ ; 0>>1
+    0, 0,  1, 0,  0, 0,  0, 0,  0, 0,  \ ; 0>>2
+    0, 0,  0,-1,  0, 2,  2,-1, -1, 2,  \ ; 0>>3
+\
+    0, 0,  0,-1,  0, 2,  2,-1, -1, 2,  \ ; 1>>2
+    0, 0,  0, 1,  0, 0,  0, 0,  0, 0,  \ ; 1>>3
+    0, 0,  0, 2,  0,-1,  1, 2, -2,-1,  \ ; 1>>0
+\
+    0, 0,  0, 2,  0,-1,  1, 2, -2,-1,  \ ; 2>>3
+    0, 0, -1, 0,  0, 0,  0, 0,  0, 0,  \ ; 2>>0
+    0, 0,  0, 1,  0,-2, -2, 1,  1,-2,  \ ; 2>>1
+\
+    0, 0,  0, 1,  0,-2, -2, 1,  1,-2,  \ ; 3>>0
+    0, 0,  0,-1,  0, 0,  0, 0,  0, 0,  \ ; 3>>1
+    0, 0,  0,-2,  0, 1, -1,-2,  2, 1     ; 3>>2
+
+; J, L, T, S, Z tetriminos
+srs_table_size_3: db \
+    0, 0,  0,-1,  1,-1, -2, 0, -2,-1,  \ ; 0>>1
+    0, 0,  1, 0,  0, 0,  0, 0,  0, 0,  \ ; 0>>2
+    0, 0,  0, 1,  1, 1, -2, 0, -2, 1,  \ ; 0>>3
+\
+    0, 0,  0, 1, -1, 1,  2, 0,  2, 1,  \ ; 1>>2
+    0, 0,  0, 1,  0, 0,  0, 0,  0, 0,  \ ; 1>>3
+    0, 0,  0, 1, -1, 1,  2, 0,  2, 1,  \ ; 1>>0
+\
+    0, 0,  0, 1,  1, 1, -2, 0, -2, 1,  \ ; 2>>3
+    0, 0, -1, 0,  0, 0,  0, 0,  0, 0,  \ ; 2>>0
+    0, 0,  0,-1,  1,-1, -2, 0, -2,-1,  \ ; 2>>1
+\
+    0, 0,  0,-1, -1,-1,  2, 0,  2,-1,  \ ; 3>>0
+    0, 0,  0,-1,  0, 0,  0, 0,  0, 0,  \ ; 3>>1
+    0, 0,  0,-1, -1,-1,  2, 0,  2,-1     ; 3>>2
