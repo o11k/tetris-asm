@@ -280,6 +280,9 @@ draw_game_state_diff:
     call memcpy
     add sp, 6
 
+    test word [bx+GAME_STATE_OFF_TIMER_GEN], 0xFFFF
+    jnz .skip_tetrimino
+
 macro _dgsd_mino_to_frame index {
     mov ax, word [_dgsd_minos+(index*4)+0]
     mul cl
@@ -334,6 +337,8 @@ macro _dgsd_mino_to_frame index {
     _dgsd_mino_to_frame 1
     _dgsd_mino_to_frame 2
     _dgsd_mino_to_frame 3
+
+.skip_tetrimino:
 
     ; Draw diff between last and curr
     xor si, si

@@ -243,6 +243,10 @@ advance_game_state:
     mov word [bx+GAME_STATE_OFF_TIMER_FALL], CONSTANT_FALL_TIME
     mov byte [bx+GAME_STATE_OFF_EXTENDED_PLACEMENT], CONSTANT_EXTENDED_PLACEMENT
 
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    call advance_game_state__line_clears
+    add sp, 2
+
 .no_lockdown:
 
 .not_on_ground:
@@ -412,5 +416,70 @@ advance_game_state__side_to_side:
     pop di
     pop si
     pop bx
+    pop bp
+    ret
+
+; word advance_game_state__line_clears(Matrix *m)
+advance_game_state__line_clears:
+    push bp
+    mov  bp, sp
+    push si
+    push di
+    push bx
+
+    mov bx, word [bp+4]  ; offset in matrix
+    xor si, si           ; number of cleared lines
+
+    xor di, di           ; line number
+.clears_loop:
+    push MATRIX_W
+    push MINO_NONE
+    push bx
+    call memchr
+    add sp, 6
+    test ax, ax
+    jnz  .not_a_clear
+    inc  si
+    jmp  .remove_line
+.not_a_clear:
+
+    test si, si
+    jz   .skip_move_down
+    test di, di
+    jz   .skip_move_down
+
+    mov ax, si
+    mov cl, MATRIX_W
+    mul cl
+    neg ax
+    add ax, bx
+
+.remove_line:
+    push MATRIX_W
+    push bx
+    push ax
+    call memcpy
+    add sp, 6
+
+    push MATRIX_W
+    push MINO_NONE
+    push bx
+    call memset
+    add sp, 6
+
+.skip_move_down:
+
+    add bx, MATRIX_W
+    inc di
+    cmp di, MATRIX_H
+    jl  .clears_loop
+.clears_loop_end:
+
+.done:
+    mov ax, si
+
+    pop bx
+    pop di
+    pop si
     pop bp
     ret

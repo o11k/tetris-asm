@@ -94,3 +94,34 @@ memset:
     pop di
     pop bp
     ret
+
+
+; void *memchr(const void *ptr, word ch, word length)
+; Returns pointer to first occurence of ch in ptr, NULL if not found
+memchr:
+    push bp
+    mov  bp, sp
+    push di
+
+    mov di, word [bp+4]  ; ptr
+    mov al, byte [bp+6]  ; ch
+    mov cx, word [bp+8]  ; length
+
+    test cx, cx
+    jz   .not_found
+
+    cld
+    repne scasb
+    jnz  .not_found
+
+    dec di  ; scasb increments di after match, fix pointer
+    mov ax, di
+    jmp  .done
+
+.not_found:
+    xor ax, ax
+
+.done:
+    pop  di
+    pop  bp
+    ret
