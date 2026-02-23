@@ -17,5 +17,5 @@ jobs:
       - name: Setup FASM
         uses: stevenwdv/setup-fasm@v1
 
-      - name: Test FASM
-        run: fasm
+      - name: Make project
+        run: make
