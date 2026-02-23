@@ -3,8 +3,15 @@
 
 include 'constants.inc'
 
-macro show_word x, y, val {
-    push word_str_buffer
+macro show_word x, y, val, buffer {
+    push y
+    push x
+    push 00h
+    push buffer
+    call render_text
+    add sp, 8
+
+    push buffer
     push val
     call word_to_hex
     add sp, 4
@@ -12,7 +19,7 @@ macro show_word x, y, val {
     push y
     push x
     push 0Fh
-    push word_str_buffer
+    push buffer
     call render_text
     add sp, 8
 }
@@ -81,9 +88,6 @@ start:
     mov ax, 4C00h
     int 21h
 
-
-
-word_str_buffer: times 30 db 0
 
 include 'input/time.inc'
 include 'input/keyboard_input.inc'
