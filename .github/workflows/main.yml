@@ -2,9 +2,8 @@ name: FASM Build
 
 on:
   push:
-    branches: [ "**" ]
-  pull_request:
-    branches: [ "**" ]
+    tags:
+      - '*'
 
 jobs:
   build:
@@ -19,3 +18,19 @@ jobs:
 
       - name: Make project
         run: make
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 5. Upload tetris.com as release artifact
+      - name: Upload tetris.com
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/tetris.com
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
