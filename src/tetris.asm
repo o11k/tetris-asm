@@ -92,7 +92,7 @@ start:
 include 'input/time.inc'
 include 'input/keyboard_input.inc'
 include 'input/controls.inc'
-include 'output/render.inc'
+include 'output/render_game.inc'
 include 'output/render_text.inc'
 include 'misc.inc'
 include 'logic/prng.inc'
