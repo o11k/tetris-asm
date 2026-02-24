@@ -79,6 +79,8 @@ initialize_game_state:
     mov byte [bx+GAME_STATE_OFF_LOWEST_ROW], 0xFF
     mov byte [bx+GAME_STATE_OFF_EXTENDED_PLACEMENT], CONSTANT_EXTENDED_PLACEMENT
 
+    mov byte [bx+GAME_STATE_OFF_HOLD], MINO_NONE
+
     pop bx
     pop bp
     ret
@@ -129,6 +131,38 @@ advance_game_state:
     jmp .lockdown
 
 .no_hard_drop:
+
+; ========== HOLD ==========
+
+    mov si, word [bp+8]  ; kb_state
+    test byte [si+CONTROLS_STATE_OFF_HOLD], KEYBOARD_STATE_MASK_WAS_PRESSED
+    jz  .no_hold
+    
+    test byte [bx+GAME_STATE_OFF_FLAGS], GAME_STATE_FLAGS_MASK_HOLD
+    jnz  .no_hold
+
+    cmp byte [bx+GAME_STATE_OFF_HOLD], MINO_NONE
+    jne .no_generate_hold
+
+    call next_mino
+    mov byte [bx+GAME_STATE_OFF_HOLD], al
+.no_generate_hold:
+
+    mov si, word [bx+GAME_STATE_OFF_TETRIMINO]
+    xor cx, cx
+    mov al, byte [si+TETRIMINO_OFF_TYPE]  ; current mino
+    mov cl, byte [bx+GAME_STATE_OFF_HOLD] ; held mino
+    mov byte [bx+GAME_STATE_OFF_HOLD], al
+
+    push si  ; tetrimino
+    push cx  ; mino type
+    call initialize_tetrimino
+    add sp, 4
+
+    or byte [bx+GAME_STATE_OFF_FLAGS], GAME_STATE_FLAGS_MASK_HOLD
+
+    jmp .cleanup
+.no_hold:
 
 ; ========== LOCK DOWN TIMER ==========
 
@@ -242,6 +276,11 @@ advance_game_state:
     mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
     mov word [bx+GAME_STATE_OFF_TIMER_FALL], CONSTANT_FALL_TIME
     mov byte [bx+GAME_STATE_OFF_EXTENDED_PLACEMENT], CONSTANT_EXTENDED_PLACEMENT
+    
+    ; unset hold flag
+    mov al, GAME_STATE_FLAGS_MASK_HOLD
+    not al
+    and byte [bx+GAME_STATE_OFF_FLAGS], al
 
     push word [bx+GAME_STATE_OFF_MATRIX]
     call advance_game_state__line_clears
