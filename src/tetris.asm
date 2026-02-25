@@ -45,7 +45,7 @@ start:
 
     
 .main:
-    call draw_borders
+    call draw_game_skeleton
 
     push g_time_state
     call get_time_delta

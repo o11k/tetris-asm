@@ -13,6 +13,9 @@ MATRIX_TOP    EQU MATRIX_ORIGIN_Y - (BLOCK_SIZE*VISIBLE_MATRIX_H)
 MATRIX_LEFT   EQU MATRIX_ORIGIN_X
 MATRIX_RIGHT  EQU MATRIX_ORIGIN_X + (BLOCK_SIZE*MATRIX_W)
 
+HOLD_MATRIX_ORIGIN_X EQU 70
+HOLD_MATRIX_ORIGIN_Y EQU 50
+
 GRID_DOT_COLOR EQU 014h
 
 BORDER_WIDTH EQU 1
@@ -159,7 +162,77 @@ draw_matrix_mino:
     ret
 
 
-; void draw_rectangle(byte color, word left_x, word top_y, word width, word height)
+_dt_coords_buffer: times 2*4 dw 0
+; void draw_tetrimino(Tetrimino *t, word matrix_left_x, word matrix_bottom_y)
+draw_tetrimino:
+    push bp
+    mov  bp, sp
+    push si
+
+    ; load absolute coords into buffer
+    push _dt_coords_buffer
+    push word [bp+4]
+    call tetrimino_get_coords
+    add  sp, 4
+
+    ; cx = type
+    xor cx, cx
+    mov si, [bp+4]
+    mov cl, byte [si+TETRIMINO_OFF_TYPE]
+
+    ; push initial
+    push 0               ; [bp-4]  = draw dot
+    push word [bp+8]     ; [bp-6]  = matrix_bottom_y
+    push word [bp+6]     ; [bp-8]  = matrix_left_x
+    push 0               ; [bp-10] = col
+    push 0               ; [bp-12] = row
+    push cx              ; [bp-14] = type
+
+macro _dt_single index {
+    mov ax, word [_dt_coords_buffer+(index*4)+0]
+    mov word [bp-12], ax
+    mov ax, word [_dt_coords_buffer+(index*4)+2]
+    mov word [bp-10], ax
+    call draw_mino
+}
+    _dt_single 0
+    _dt_single 1
+    _dt_single 2
+    _dt_single 3
+
+    add sp, 12
+
+.done:
+    pop si
+    pop bp
+    ret
+
+
+; void delete_tetrimino(Tetrimino *t, word matrix_left_x, word matrix_bottom_y)
+delete_tetrimino:
+    push bp
+    mov  bp, sp
+    push bx
+    push si
+
+    mov si, [bp+4]
+    mov bl, byte [si+TETRIMINO_OFF_TYPE]
+    mov byte [si+TETRIMINO_OFF_TYPE], MINO_NONE
+
+    push word [bp+8]
+    push word [bp+6]
+    push word [bp+4]
+    call draw_tetrimino
+    add  sp, 6
+
+    mov byte [si+TETRIMINO_OFF_TYPE], bl
+
+    pop si
+    pop bx
+    pop bp
+    ret
+
+
 ; void draw_border(
 ;    word color,
 ;    word border_width,
@@ -267,7 +340,7 @@ draw_border:
     pop bp
     ret
 
-draw_borders:
+draw_game_skeleton:
     push word MATRIX_LEFT
     push word MATRIX_RIGHT
     push word MATRIX_BOTTOM
@@ -322,33 +395,11 @@ draw_matrix_tetrimino:
     ret
 
 
-; void delete_matrix_tetrimino(Tetrimino *t)
-delete_matrix_tetrimino:
-    push bp
-    mov  bp, sp
-    push bx
-    push si
-
-    mov si, [bp+4]
-    mov bl, byte [si+TETRIMINO_OFF_TYPE]
-    mov byte [si+TETRIMINO_OFF_TYPE], MINO_NONE
-
-    push word [bp+4]
-    call draw_matrix_tetrimino
-    add  sp, 2
-
-    mov byte [si+TETRIMINO_OFF_TYPE], bl
-
-    pop si
-    pop bx
-    pop bp
-    ret
-
-
 _dgsd_last_frame: times MATRIX_W*MATRIX_H db 0FFh
 _dgsd_curr_frame: times MATRIX_W*MATRIX_H db 0
+_dgsd_last_hold: db 0
 _dgsd_minos: times 2*4 dw 0
-_dgsd_ghost: times TETRIMINO_SIZE dw 0
+_dgsd_tetrimino_buffer: times TETRIMINO_SIZE db 0
 
 ; void draw_game_state_diff(State *state)
 draw_game_state_diff:
@@ -380,13 +431,13 @@ macro _dgsd_mino_to_frame index {
     ; Copy ghost tetrimino to matrix
     push TETRIMINO_SIZE
     push word [bx+GAME_STATE_OFF_TETRIMINO]
-    push _dgsd_ghost
+    push _dgsd_tetrimino_buffer
     call memcpy
     add sp, 6
 
     push 0
     push -1
-    push _dgsd_ghost
+    push _dgsd_tetrimino_buffer
     push word [bx+GAME_STATE_OFF_MATRIX]
     mov ax, 1
 .ghost_loop:
@@ -397,11 +448,11 @@ macro _dgsd_mino_to_frame index {
 .ghost_loop_end:
 
     push _dgsd_minos
-    push _dgsd_ghost
+    push _dgsd_tetrimino_buffer
     call tetrimino_get_coords
     add sp, 4
 
-    mov si, _dgsd_ghost
+    mov si, _dgsd_tetrimino_buffer
     mov dl, MINO_GHOST
     mov cl, MATRIX_W
 
@@ -460,6 +511,48 @@ macro _dgsd_mino_to_frame index {
     push _dgsd_last_frame
     call memcpy
     add sp, 6
+
+    ; Update held tetrimino
+    xor ax, ax
+    mov al, byte [_dgsd_last_hold]
+    cmp al, byte [bx+GAME_STATE_OFF_HOLD]
+    je  .no_change_hold
+
+    cmp byte [_dgsd_last_hold], MINO_NONE
+    je  .no_delete_hold
+
+    push _dgsd_tetrimino_buffer
+    push ax
+    call initialize_tetrimino
+    add sp, 4
+    mov byte [_dgsd_tetrimino_buffer+TETRIMINO_OFF_ROOT+0], 0
+    mov byte [_dgsd_tetrimino_buffer+TETRIMINO_OFF_ROOT+1], 0
+
+    push HOLD_MATRIX_ORIGIN_Y
+    push HOLD_MATRIX_ORIGIN_X
+    push _dgsd_tetrimino_buffer
+    call delete_tetrimino
+    add sp, 6
+.no_delete_hold:
+
+    xor ax, ax
+    mov al, byte [bx+GAME_STATE_OFF_HOLD]
+    push _dgsd_tetrimino_buffer
+    push ax
+    call initialize_tetrimino
+    add sp, 4
+    mov byte [_dgsd_tetrimino_buffer+TETRIMINO_OFF_ROOT+0], 0
+    mov byte [_dgsd_tetrimino_buffer+TETRIMINO_OFF_ROOT+1], 0
+
+    push HOLD_MATRIX_ORIGIN_Y
+    push HOLD_MATRIX_ORIGIN_X
+    push _dgsd_tetrimino_buffer
+    call draw_tetrimino
+    add sp, 6
+
+    mov al, byte [bx+GAME_STATE_OFF_HOLD]
+    mov byte [_dgsd_last_hold], al
+.no_change_hold:
 
     pop si
     pop bx
