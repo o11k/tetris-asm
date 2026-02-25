@@ -43,6 +43,29 @@ macro _state_machine_extended_placement_after {
 .no_extended_placement:
 }
 
+; Generate new mino and advance the next queue. Mino popped from queue in ax
+; Expects: bx=game_state, ax, cx and di can be overridden
+macro _state_machine_next_mino {
+    xor ax, ax
+    mov al, byte [bx+GAME_STATE_OFF_NEXT_QUEUE+0]
+    mov di, ax
+
+    mov cl, byte [bx+GAME_STATE_OFF_NEXT_QUEUE+1]
+    mov     byte [bx+GAME_STATE_OFF_NEXT_QUEUE+0], cl
+    mov cl, byte [bx+GAME_STATE_OFF_NEXT_QUEUE+2]
+    mov     byte [bx+GAME_STATE_OFF_NEXT_QUEUE+1], cl
+    mov cl, byte [bx+GAME_STATE_OFF_NEXT_QUEUE+3]
+    mov     byte [bx+GAME_STATE_OFF_NEXT_QUEUE+2], cl
+    mov cl, byte [bx+GAME_STATE_OFF_NEXT_QUEUE+4]
+    mov     byte [bx+GAME_STATE_OFF_NEXT_QUEUE+3], cl
+    mov cl, byte [bx+GAME_STATE_OFF_NEXT_QUEUE+5]
+    mov     byte [bx+GAME_STATE_OFF_NEXT_QUEUE+4], cl
+
+    call next_mino
+    mov byte [bx+GAME_STATE_OFF_NEXT_QUEUE+5], al
+    mov ax, di
+}
+
 ; void initialize_game_state(State *state, Matrix *m, Tetrimino *t)
 initialize_game_state:
     push bp
@@ -68,6 +91,19 @@ initialize_game_state:
     mov ax, word [bp+8]  ; tetrimino
     mov word [bx+GAME_STATE_OFF_TETRIMINO], ax
     _state_machine_try_move -1, 0
+
+    call next_mino
+    mov byte [bx+GAME_STATE_OFF_NEXT_QUEUE+0], al
+    call next_mino
+    mov byte [bx+GAME_STATE_OFF_NEXT_QUEUE+1], al
+    call next_mino
+    mov byte [bx+GAME_STATE_OFF_NEXT_QUEUE+2], al
+    call next_mino
+    mov byte [bx+GAME_STATE_OFF_NEXT_QUEUE+3], al
+    call next_mino
+    mov byte [bx+GAME_STATE_OFF_NEXT_QUEUE+4], al
+    call next_mino
+    mov byte [bx+GAME_STATE_OFF_NEXT_QUEUE+5], al
 
     mov word [bx+GAME_STATE_OFF_TIMER_GEN], 0
     mov word [bx+GAME_STATE_OFF_TIMER_REPEAT], 0
@@ -104,7 +140,7 @@ advance_game_state:
     ja  .no_generation_yet
 
     mov word [bx+GAME_STATE_OFF_TIMER_GEN], 0
-    call next_mino
+    _state_machine_next_mino
     push word [bx+GAME_STATE_OFF_TETRIMINO]
     push ax
     call initialize_tetrimino
@@ -144,7 +180,7 @@ advance_game_state:
     cmp byte [bx+GAME_STATE_OFF_HOLD], MINO_NONE
     jne .no_generate_hold
 
-    call next_mino
+    _state_machine_next_mino
     mov byte [bx+GAME_STATE_OFF_HOLD], al
 .no_generate_hold:
 

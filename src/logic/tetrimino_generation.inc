@@ -52,5 +52,5 @@ tetrimino_templates_j: db 02h,   3,     0,         19,3,  1,0, 1,1, 1,2, 2,0
 tetrimino_templates_s: db 03h,   3,     0,         19,3,  1,0, 1,1, 2,1, 2,2
 tetrimino_templates_z: db 04h,   3,     0,         19,3,  2,0, 2,1, 1,1, 1,2
 tetrimino_templates_t: db 05h,   3,     0,         19,3,  1,0, 1,1, 1,2, 2,1
-tetrimino_templates_o: db 06h,   2,     0,         20,4,  0,0, 1,0, 0,1, 1,1
+tetrimino_templates_o: db 06h,   3,     0,         19,3,  1,1, 2,1, 1,2, 2,2
 tetrimino_templates_i: db 07h,   4,     0,         18,3,  2,0, 2,1, 2,2, 2,3

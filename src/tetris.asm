@@ -88,6 +88,7 @@ start:
     mov ax, 4C00h
     int 21h
 
+str_buf: times 5 db 0
 
 include 'input/time.inc'
 include 'input/keyboard_input.inc'

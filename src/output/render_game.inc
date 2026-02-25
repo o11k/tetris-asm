@@ -397,7 +397,8 @@ draw_matrix_tetrimino:
 
 _dgsd_last_frame: times MATRIX_W*MATRIX_H db 0FFh
 _dgsd_curr_frame: times MATRIX_W*MATRIX_H db 0
-_dgsd_last_hold: db 0
+_dgsd_last_hold: db MINO_NONE
+_dgsd_last_next_queue: times 6 db MINO_NONE
 _dgsd_minos: times 2*4 dw 0
 _dgsd_tetrimino_buffer: times TETRIMINO_SIZE db 0
 
@@ -514,12 +515,67 @@ macro _dgsd_mino_to_frame index {
 
     ; Update held tetrimino
     xor ax, ax
+    push HOLD_MATRIX_ORIGIN_Y
+    push HOLD_MATRIX_ORIGIN_X
+    mov al, byte [bx+GAME_STATE_OFF_HOLD]
+    push ax
     mov al, byte [_dgsd_last_hold]
-    cmp al, byte [bx+GAME_STATE_OFF_HOLD]
-    je  .no_change_hold
+    push ax
+    call draw_game_state_diff__tetrimino
+    add sp, 8
 
-    cmp byte [_dgsd_last_hold], MINO_NONE
-    je  .no_delete_hold
+    mov al, byte [bx+GAME_STATE_OFF_HOLD]
+    mov byte [_dgsd_last_hold], al
+
+    ; Update next queue
+    xor ax, ax
+macro _dgsd_next_queue index {
+    push 50 + (BLOCK_SIZE*index*3)
+    push 220
+    mov al, byte [bx+GAME_STATE_OFF_NEXT_QUEUE+index]
+
+    ; TODO dynamic when CONSTANT_NEXT_QUEUE_RENDERED is settable
+    if index >= CONSTANT_NEXT_QUEUE_RENDERED
+        mov al, 0
+    end if
+
+    push ax
+    mov si, ax
+    mov al, byte [_dgsd_last_next_queue+index]
+    push ax
+    call draw_game_state_diff__tetrimino
+    add sp, 8
+    mov ax, si
+    mov byte [_dgsd_last_next_queue+index], al
+}
+
+    _dgsd_next_queue 0
+    _dgsd_next_queue 1
+    _dgsd_next_queue 2
+    _dgsd_next_queue 3
+    _dgsd_next_queue 4
+    _dgsd_next_queue 5
+
+    pop si
+    pop bx
+    pop bp
+    ret
+
+; void draw_game_state_diff__tetrimino(Mino old, Mino new, word matrix_left_x, word matrix_bottom_y)
+draw_game_state_diff__tetrimino:
+    push bp
+    mov  bp, sp
+    push si
+    push di
+    push bx
+
+    xor ax, ax
+    mov al, byte [bp+4] ; old
+    cmp al, byte [bp+6] ; new
+    je  .done
+
+    cmp byte [bp+4], MINO_NONE
+    je  .skip_delete
 
     push _dgsd_tetrimino_buffer
     push ax
@@ -528,15 +584,15 @@ macro _dgsd_mino_to_frame index {
     mov byte [_dgsd_tetrimino_buffer+TETRIMINO_OFF_ROOT+0], 0
     mov byte [_dgsd_tetrimino_buffer+TETRIMINO_OFF_ROOT+1], 0
 
-    push HOLD_MATRIX_ORIGIN_Y
-    push HOLD_MATRIX_ORIGIN_X
+    push word [bp+10]
+    push word [bp+8]
     push _dgsd_tetrimino_buffer
     call delete_tetrimino
     add sp, 6
-.no_delete_hold:
+.skip_delete:
 
     xor ax, ax
-    mov al, byte [bx+GAME_STATE_OFF_HOLD]
+    mov al, byte [bp+6]
     push _dgsd_tetrimino_buffer
     push ax
     call initialize_tetrimino
@@ -544,17 +600,19 @@ macro _dgsd_mino_to_frame index {
     mov byte [_dgsd_tetrimino_buffer+TETRIMINO_OFF_ROOT+0], 0
     mov byte [_dgsd_tetrimino_buffer+TETRIMINO_OFF_ROOT+1], 0
 
-    push HOLD_MATRIX_ORIGIN_Y
-    push HOLD_MATRIX_ORIGIN_X
+    push word [bp+10]
+    push word [bp+8]
     push _dgsd_tetrimino_buffer
     call draw_tetrimino
     add sp, 6
 
     mov al, byte [bx+GAME_STATE_OFF_HOLD]
     mov byte [_dgsd_last_hold], al
-.no_change_hold:
 
-    pop si
+.done:
+    ;add sp, @@@
     pop bx
+    pop di
+    pop si
     pop bp
     ret
