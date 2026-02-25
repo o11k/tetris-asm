@@ -140,7 +140,14 @@ advance_game_state:
     ja  .no_generation_yet
 
     mov word [bx+GAME_STATE_OFF_TIMER_GEN], 0
+    mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
+    mov word [bx+GAME_STATE_OFF_TIMER_FALL], CONSTANT_FALL_TIME
+    mov byte [bx+GAME_STATE_OFF_EXTENDED_PLACEMENT], CONSTANT_EXTENDED_PLACEMENT
+
     _state_machine_next_mino
+
+.initialize_tetrimino:
+
     push word [bx+GAME_STATE_OFF_TETRIMINO]
     push ax
     call initialize_tetrimino
@@ -148,6 +155,16 @@ advance_game_state:
 
     _state_machine_try_move -1, 0
 
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
+    push word [bx+GAME_STATE_OFF_MATRIX]
+    call tetrimino_detect_collision
+    add sp, 4
+
+    test ax, ax
+    jz   .no_block_out
+    or   word [bx+GAME_STATE_OFF_FLAGS], GAME_STATE_FLAGS_MASK_GAME_OVER
+
+.no_block_out:
 .no_generation_yet:
     jmp .cleanup
 .no_generation_phase:
@@ -185,19 +202,15 @@ advance_game_state:
 .no_generate_hold:
 
     mov si, word [bx+GAME_STATE_OFF_TETRIMINO]
-    xor cx, cx
-    mov al, byte [si+TETRIMINO_OFF_TYPE]  ; current mino
-    mov cl, byte [bx+GAME_STATE_OFF_HOLD] ; held mino
-    mov byte [bx+GAME_STATE_OFF_HOLD], al
-
-    push si  ; tetrimino
-    push cx  ; mino type
-    call initialize_tetrimino
-    add sp, 4
+    xor ax, ax
+    mov cl, byte [si+TETRIMINO_OFF_TYPE]  ; current mino
+    mov al, byte [bx+GAME_STATE_OFF_HOLD] ; held mino
+    mov byte [bx+GAME_STATE_OFF_HOLD], cl
 
     or byte [bx+GAME_STATE_OFF_FLAGS], GAME_STATE_FLAGS_MASK_HOLD
+    
+    jmp .initialize_tetrimino
 
-    jmp .cleanup
 .no_hold:
 
 ; ========== LOCK DOWN TIMER ==========
@@ -304,14 +317,21 @@ advance_game_state:
 
 .lockdown:
     push word [bx+GAME_STATE_OFF_TETRIMINO]
+    call advance_game_state__detect_lock_out
+    add sp, 2
+    test ax, ax
+    jz   .no_lock_out
+
+    or  word [bx+GAME_STATE_OFF_FLAGS], GAME_STATE_FLAGS_MASK_GAME_OVER
+    jmp .cleanup
+
+.no_lock_out:
+    push word [bx+GAME_STATE_OFF_TETRIMINO]
     push word [bx+GAME_STATE_OFF_MATRIX]
     call tetrimino_lock_down
     add sp, 4
 
     mov word [bx+GAME_STATE_OFF_TIMER_GEN],  CONSTANT_GEN_TIME
-    mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
-    mov word [bx+GAME_STATE_OFF_TIMER_FALL], CONSTANT_FALL_TIME
-    mov byte [bx+GAME_STATE_OFF_EXTENDED_PLACEMENT], CONSTANT_EXTENDED_PLACEMENT
     
     ; unset hold flag
     mov al, GAME_STATE_FLAGS_MASK_HOLD
@@ -553,6 +573,43 @@ advance_game_state__line_clears:
 .done:
     mov ax, si
 
+    pop bx
+    pop di
+    pop si
+    pop bp
+    ret
+
+
+_state_machine_minos: times 2*4 dw 0
+; bool advance_game_state__detect_lock_out(Tetrimino *t)
+advance_game_state__detect_lock_out:
+    push bp
+    mov  bp, sp
+    push si
+    push di
+    push bx
+
+    mov si, word [bp+4]
+
+    push _state_machine_minos
+    push si
+    call tetrimino_get_coords
+    add sp, 4
+
+    xor ax, ax
+    cmp word [_state_machine_minos+(4*0)+0], VISIBLE_MATRIX_H
+    jl  .return
+    cmp word [_state_machine_minos+(4*1)+0], VISIBLE_MATRIX_H
+    jl  .return
+    cmp word [_state_machine_minos+(4*2)+0], VISIBLE_MATRIX_H
+    jl  .return
+    cmp word [_state_machine_minos+(4*3)+0], VISIBLE_MATRIX_H
+    jl  .return
+
+    mov ax, 1
+
+.return:
+    ;add sp, @@@
     pop bx
     pop di
     pop si

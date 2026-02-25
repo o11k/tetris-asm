@@ -66,8 +66,8 @@ draw_rectangle:
     pop bp
     ret
 
-;              NONE L    J    S    Z    T    O    I    GHOST
-mino_colors db 00h, 2Ah, 37h, 2Fh, 28h, 23h, 0Eh, 0Bh, 14h
+;              NONE L    J    S    Z    T    O    I    GHOST DEAD
+mino_colors db 00h, 2Ah, 37h, 2Fh, 28h, 23h, 0Eh, 0Bh, 14h,  17h
 
 ; void draw_mino(Mino mino, word row, word col, word matrix_left_x, word matrix_bottom_y, bool draw_dot)
 draw_mino:
@@ -477,6 +477,24 @@ macro _dgsd_mino_to_frame index {
     _dgsd_mino_to_frame 3
 
 .skip_tetrimino:
+
+    ; Color grey when dead
+    test word [bx+GAME_STATE_OFF_FLAGS], GAME_STATE_FLAGS_MASK_GAME_OVER
+    jz   .no_game_over
+    xor si, si
+.loop_game_over:
+    cmp si, VISIBLE_MATRIX_H*MATRIX_W
+    jge .loop_game_over_end
+
+    cmp byte [_dgsd_curr_frame+si], MINO_NONE
+    je  .no_game_over_mino
+    mov byte [_dgsd_curr_frame+si], MINO_DEAD
+.no_game_over_mino:    
+
+    inc si
+    jmp .loop_game_over
+.loop_game_over_end:
+.no_game_over:
 
     ; Draw diff between last and curr
     xor si, si

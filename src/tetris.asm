@@ -79,6 +79,9 @@ start:
     call draw_game_state_diff
     add  sp, 2
 
+    test word [g_game_state+GAME_STATE_OFF_FLAGS], GAME_STATE_FLAGS_MASK_GAME_OVER
+    jnz  .main_loop_end
+
     jmp .main_loop
 .main_loop_end:
 

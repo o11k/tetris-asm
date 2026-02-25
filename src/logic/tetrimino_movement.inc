@@ -14,7 +14,7 @@ macro _tetrimino_get_coords_single index {
     cbw
     mov word [si+2], ax
 }
-; void tetrimino_get_coords(Tetrimino *t, word[2][4] *buffer)
+; void tetrimino_get_coords(Tetrimino *t, word (*buffer)[4][2])
 tetrimino_get_coords:
     push bp
     mov  bp, sp
