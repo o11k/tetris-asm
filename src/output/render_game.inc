@@ -18,41 +18,44 @@ GRID_DOT_COLOR EQU 014h
 BORDER_WIDTH EQU 1
 BORDER_COLOR EQU 0Fh  ; white
 
-mino_colors db 00h, 2Ah, 37h, 2Fh, 28h, 23h, 0Eh, 0Bh, 14h
-; void draw_block(Mino mino, word left_x, word top_y)
-draw_block:
+
+; void draw_rectangle(byte color, word left_x, word top_y, word width, word height)
+draw_rectangle:
     push bp
     mov  bp, sp
     push bx
     push si
     push di
 
-    ; setup registers for write-pixel interrupt
-    mov si, [bp+4]
-    mov al, [mino_colors+si] ; color
-    mov cx, [bp+6]           ; x
-    mov dx, [bp+8]           ; y
-    mov bx, 0                ; page
-    mov ah, 0Ch
+    ; setup registers for interrupt
+    mov al, byte [bp+4]  ; color
+    mov cx, word [bp+6]  ; x
+    mov dx, word [bp+8]  ; y
+    mov bx, 0            ; page
+    mov ah, 0Ch          ; function
 
-    xor si, si
-.loop1:
-    cmp si, BLOCK_SIZE
-    jnl .loop1_end
-    xor di, di
-.loop2:
-    cmp di, BLOCK_SIZE
-    jge .loop2_end
-    inc cx  ; x++
-    int 10h
-    inc di
-    jmp .loop2
-.loop2_end:
-    sub cx, BLOCK_SIZE
-    inc dx  ; y++
-    inc si
-    jmp .loop1
-.loop1_end:
+    mov di, word [bp+12]  ; height
+.loop_rows:
+    cmp di, 0
+    jle .loop_rows_end
+
+    mov si, word [bp+10]  ; width
+.loop_cols:
+    cmp si, 0
+    jle .loop_cols_end
+
+    int 10h  ; draw graphics pixel
+
+    inc cx
+    dec si
+    jmp .loop_cols
+.loop_cols_end:
+
+    mov cx, word [bp+6]
+    inc dx
+    dec di
+    jmp .loop_rows
+.loop_rows_end:
 
     pop di
     pop si
@@ -60,33 +63,72 @@ draw_block:
     pop bp
     ret
 
-; void draw_matrix_block(Mino mino, word row, word col)
-draw_matrix_block:
+;              NONE L    J    S    Z    T    O    I    GHOST
+mino_colors db 00h, 2Ah, 37h, 2Fh, 28h, 23h, 0Eh, 0Bh, 14h
+
+; void draw_mino(Mino mino, word row, word col, word matrix_left_x, word matrix_bottom_y, bool draw_dot)
+draw_mino:
     push bp
     mov  bp, sp
     push bx
     push si
     push di
 
-    ;y = si = origin_y - block_size - block_size*row
-    mov ax, BLOCK_SIZE
-    mul word [bp+6]
-    add ax, BLOCK_SIZE
-    neg ax
-    add ax, MATRIX_ORIGIN_Y
-    mov si, ax
-    push si
-    ;x = di = origin_x + block_size*col
-    mov ax, BLOCK_SIZE
-    mul word [bp+8]
-    add ax, MATRIX_ORIGIN_X
-    mov di, ax
-    push di
-    ;mino
-    push word [bp+4]
+    push BLOCK_SIZE  ; height
+    push BLOCK_SIZE  ; width
 
-    call draw_block
-    add sp, 6
+    ; top y
+    mov ax, word [bp+6]  ; row
+    inc ax
+    mov cx, BLOCK_SIZE
+    mul cx
+    neg ax
+    add ax, word [bp+12]  ; matrix_bottom_y
+    push ax
+    mov si, ax
+
+    ; left x
+    mov ax, word [bp+8]  ; col
+    mov cx, BLOCK_SIZE
+    mul cx
+    add ax, word [bp+10]  ; matrix_left_x
+    push ax
+    mov di, ax
+
+    ; color
+    mov bx, word [bp+4]  ; mino
+    xor ax, ax
+    mov al, byte [mino_colors+bx]
+    push ax
+
+    call draw_rectangle
+    add sp, 10
+
+    ; draw dot
+    test word [bp+14], 0FFFFh
+    jz   .no_dot
+    mov cx, di
+    mov dx, si
+    mov bx, 0
+    mov al, GRID_DOT_COLOR
+    mov ah, 0Ch
+    int 10h
+
+.no_dot:
+
+    pop di
+    pop si
+    pop bx
+    pop bp
+    ret
+
+; void draw_matrix_mino(Mino mino, word row, word col)
+draw_matrix_mino:
+    push bp
+    mov  bp, sp
+    push bx
+    push si
+    push di
 
     cmp word [bp+4], MINO_NONE
     jne .no_grid_dot
@@ -94,15 +136,20 @@ draw_matrix_block:
     je  .no_grid_dot
     cmp word [bp+8], 0
     je  .no_grid_dot
-
-    inc di
-    mov al, GRID_DOT_COLOR ; color
-    mov cx, di             ; x
-    mov dx, si             ; y
-    mov bx, 0              ; page
-    mov ah, 0Ch
-    int 10h
+.grid_dot:
+    push 1
+    jmp .endif_grid_dot
 .no_grid_dot:
+    push 0
+.endif_grid_dot:
+
+    push MATRIX_ORIGIN_Y
+    push MATRIX_ORIGIN_X
+    push word [bp+8]
+    push word [bp+6]
+    push word [bp+4]
+    call draw_mino
+    add sp, 12
 
 .cleanup:
     pop di
@@ -112,6 +159,7 @@ draw_matrix_block:
     ret
 
 
+; void draw_rectangle(byte color, word left_x, word top_y, word width, word height)
 ; void draw_border(
 ;    word color,
 ;    word border_width,
@@ -123,61 +171,99 @@ draw_matrix_block:
 draw_border:
     push bp
     mov  bp, sp
-    push si
     push bx
+    push si
 
-    ; setup registers for write-pixel interrupt
-    mov al, [bp+4]  ; color
-    mov bx, 0       ; page
-    mov ah, 0Ch
+    ; === TOP ===
+    ; height
+    push word [bp+6]      ; border_width
+    ; width
+    mov ax, word [bp+12]  ; obj_right
+    sub ax, word [bp+14]  ; obj_left
+    add ax, word [bp+6]   ; border_width
+    add ax, word [bp+6]
+    push ax
+    ; top y
+    mov ax, word [bp+8]   ; obj_top
+    sub ax, word [bp+6]   ; border_width
+    push ax
+    ; left x
+    mov ax, word [bp+14]  ; obj_left
+    sub ax, word [bp+6]   ; border_width
+    push ax
+    ; color
+    push word [bp+4]
+    
+    call draw_rectangle
+    add sp, 10
 
-    dec word [bp+10] ; bottom
-    inc word [bp+14] ; left
+    ; === BOTTOM ===
+    ; height
+    push word [bp+6]      ; border_width
+    ; width
+    mov ax, word [bp+12]  ; obj_right
+    sub ax, word [bp+14]  ; obj_left
+    add ax, word [bp+6]   ; border_width
+    add ax, word [bp+6]
+    push ax
+    ; top y
+    push word [bp+10]     ; obj_bottom
+    ; left x
+    mov ax, word [bp+14]  ; obj_left
+    sub ax, word [bp+6]   ; border_width
+    push ax
+    ; color
+    push word [bp+4]
+    
+    call draw_rectangle
+    add sp, 10
 
-    xor si, si
-.loop_border_width:
-    cmp si, [bp+6] ; width
-    jnl .loop_border_width_end
+    ; === LEFT ===
+    ; height
+    mov ax, word [bp+10]  ; obj_bottom
+    sub ax, word [bp+8]   ; obj_top
+    add ax, word [bp+6]   ; border_width
+    add ax, word [bp+6]
+    push ax
+    ; width
+    push word [bp+6]      ; border_width
+    ; top y
+    mov ax, word [bp+8]   ; obj_top
+    sub ax, word [bp+6]   ; border_width
+    push ax
+    ; left x
+    mov ax, word [bp+14]  ; obj_left
+    sub ax, word [bp+6]   ; border_width
+    push ax
+    ; color
+    push word [bp+4]
+    
+    call draw_rectangle
+    add sp, 10
 
-    dec word [bp+8]  ; top
-    inc word [bp+10] ; bottom
-    inc word [bp+12] ; right
-    dec word [bp+14] ; left
+    ; === RIGHT ===
+    ; height
+    mov ax, word [bp+10]  ; obj_bottom
+    sub ax, word [bp+8]   ; obj_top
+    add ax, word [bp+6]   ; border_width
+    add ax, word [bp+6]
+    push ax
+    ; width
+    push word [bp+6]      ; border_width
+    ; top y
+    mov ax, word [bp+8]   ; obj_top
+    sub ax, word [bp+6]   ; border_width
+    push ax
+    ; left x
+    push word [bp+12]     ; obj_right
+    ; color
+    push word [bp+4]
+    
+    call draw_rectangle
+    add sp, 10
 
-    mov dx, [bp+8] ; top
-.loop_vertical:
-    cmp dx, [bp+10] ; bottom
-    jg  .loop_vertical_end
-
-    mov cx, [bp+12] ; right
-    int 10h
-    mov cx, [bp+14] ; left
-    int 10h
-
-    inc dx
-    jmp .loop_vertical
-.loop_vertical_end:
-
-mov cx, [bp+14] ; left
-.loop_horizontal:
-    cmp cx, [bp+12] ; right
-    jg  .loop_horizontal_end
-
-    mov dx, [bp+8]  ; top
-    int 10h
-    mov dx, [bp+10] ; bottom
-    int 10h
-
-    inc cx
-    jmp .loop_horizontal
-.loop_horizontal_end:
-
-    inc si
-    jmp .loop_border_width
-.loop_border_width_end:
-
-    pop bx
     pop si
+    pop bx
     pop bp
     ret
 
@@ -197,7 +283,7 @@ macro _draw_matrix_tetrimino_single index {
     mov word [bp-6], ax
     mov ax, word [_draw_matrix_tetrimino_coords_buffer+(index*4)+2]
     mov word [bp-4], ax
-    call draw_matrix_block
+    call draw_matrix_mino
 }
 _draw_matrix_tetrimino_coords_buffer: times 2*4 dw 0
 ; void draw_matrix_tetrimino(Tetrimino *t)
@@ -360,7 +446,7 @@ macro _dgsd_mino_to_frame index {
     xor cx, cx
     mov cl, byte [_dgsd_curr_frame+si]
     push cx
-    call draw_matrix_block
+    call draw_matrix_mino
     add sp, 6
 .skip_draw:
 
