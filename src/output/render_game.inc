@@ -27,6 +27,12 @@ MARATHON_LINES_MIDDLE EQU 70
 SECONDS_TOP    EQU 90
 SECONDS_MIDDLE EQU 70
 
+RESTART_BANNER_TOP     EQU 60
+RESTART_BANNER_LEFT    EQU 70
+RESTART_BANNER_H       EQU SCREEN_H - 2*RESTART_BANNER_TOP
+RESTART_BANNER_W       EQU SCREEN_W - 2*RESTART_BANNER_LEFT
+RESTART_BANNER_PADDING EQU 5
+
 ; void draw_rectangle(byte color, word left_x, word top_y, word width, word height)
 draw_rectangle:
     push bp
@@ -423,6 +429,109 @@ draw_matrix_tetrimino:
     ret
 
 
+_drb_initial_str_1: db " ","     Tetris      ", 0
+_drb_initial_str_2: db " ","40 lines marathon", 0
+_drb_initial_str_3: db " ","<space> to start ", 0
+_drb_win_str_1:     db " ","    You win!     ", 0
+_drb_lose_str_1:    db " ","    You lose     ", 0
+_drb_restart_str:   db "","<space> to restart", 0
+; void draw_restart_banner(word state)
+; state: 0=initial, 1=win, 2=lose
+draw_restart_banner:
+    push bp
+    mov  bp, sp
+
+    push RESTART_BANNER_H
+    push RESTART_BANNER_W
+    push RESTART_BANNER_TOP
+    push RESTART_BANNER_LEFT
+    push 00h
+    call draw_rectangle
+    add sp, 10
+
+    push RESTART_BANNER_LEFT+RESTART_BANNER_PADDING
+    push RESTART_BANNER_LEFT+RESTART_BANNER_W-RESTART_BANNER_PADDING
+    push RESTART_BANNER_TOP +RESTART_BANNER_H-RESTART_BANNER_PADDING
+    push RESTART_BANNER_TOP +RESTART_BANNER_PADDING
+    push BORDER_WIDTH
+    push BORDER_COLOR
+    call draw_border
+    add sp, 12
+
+    cmp word [bp+4], 1
+    je  .state_win
+    cmp word [bp+4], 2
+    je  .state_lose
+    ; cmp word [bp+4], 0
+    ; je  .state_initial
+
+.state_initial:
+    push RESTART_BANNER_TOP + 3*RESTART_BANNER_PADDING + 0
+    push RESTART_BANNER_LEFT+ 3*RESTART_BANNER_PADDING
+    push 0Fh
+    push _drb_initial_str_1
+    call render_text
+    add sp, 8
+    push RESTART_BANNER_TOP + 3*RESTART_BANNER_PADDING + 20
+    push RESTART_BANNER_LEFT+ 3*RESTART_BANNER_PADDING
+    push 0Fh
+    push _drb_initial_str_2
+    call render_text
+    add sp, 8
+    push RESTART_BANNER_TOP + 3*RESTART_BANNER_PADDING + 40
+    push RESTART_BANNER_LEFT+ 3*RESTART_BANNER_PADDING
+    push 0Fh
+    push _drb_initial_str_3
+    call render_text
+    add sp, 8
+
+    jmp .return
+.state_win:
+    push RESTART_BANNER_TOP + 3*RESTART_BANNER_PADDING + 10
+    push RESTART_BANNER_LEFT+ 3*RESTART_BANNER_PADDING
+    push 0Fh
+    push _drb_win_str_1
+    call render_text
+    add sp, 8
+    push RESTART_BANNER_TOP + 3*RESTART_BANNER_PADDING + 30
+    push RESTART_BANNER_LEFT+ 3*RESTART_BANNER_PADDING
+    push 0Fh
+    push _drb_restart_str
+    call render_text
+    add sp, 8
+
+    jmp .return
+.state_lose:
+    push RESTART_BANNER_TOP + 3*RESTART_BANNER_PADDING + 10
+    push RESTART_BANNER_LEFT+ 3*RESTART_BANNER_PADDING
+    push 0Fh
+    push _drb_lose_str_1
+    call render_text
+    add sp, 8
+    push RESTART_BANNER_TOP + 3*RESTART_BANNER_PADDING + 30
+    push RESTART_BANNER_LEFT+ 3*RESTART_BANNER_PADDING
+    push 0Fh
+    push _drb_restart_str
+    call render_text
+    add sp, 8
+
+    ; jmp .return
+.return:
+    pop bp
+    ret
+
+
+; void delete_entire_screen(void)
+delete_entire_screen:
+    push SCREEN_H
+    push SCREEN_W
+    push 0
+    push 0
+    push 00h  ; black
+    call draw_rectangle
+    add sp, 10
+    ret
+
 _dgsd_last_frame: times MATRIX_W*MATRIX_H db 0FFh
 _dgsd_curr_frame: times MATRIX_W*MATRIX_H db 0
 _dgsd_last_hold: db MINO_NONE
@@ -431,6 +540,27 @@ _dgsd_last_seconds: dw 0FFFFh
 _dgsd_last_next_queue: times 6 db MINO_NONE
 _dgsd_minos: times 2*4 dw 0
 _dgsd_tetrimino_buffer: times TETRIMINO_SIZE db 0
+
+;void reset_game_state_diff(void)
+reset_game_state_diff:
+    push MATRIX_W*MATRIX_H
+    push 0FFh
+    push _dgsd_last_frame
+    call memset
+    add sp, 6
+
+    mov byte [_dgsd_last_hold], MINO_NONE
+    mov word [_dgsd_last_marathon_lines], 0
+    mov word [_dgsd_last_seconds], 0FFFFh
+
+    mov byte [_dgsd_last_next_queue+0], MINO_NONE
+    mov byte [_dgsd_last_next_queue+1], MINO_NONE
+    mov byte [_dgsd_last_next_queue+2], MINO_NONE
+    mov byte [_dgsd_last_next_queue+3], MINO_NONE
+    mov byte [_dgsd_last_next_queue+4], MINO_NONE
+    mov byte [_dgsd_last_next_queue+5], MINO_NONE
+
+    ret
 
 ; void draw_game_state_diff(State *state)
 draw_game_state_diff:

@@ -45,7 +45,44 @@ start:
 
 
 .main:
+
+    ; Draw demo game
     call draw_game_skeleton
+
+    push g_tetrimino
+    push g_matrix
+    push g_game_state
+    call initialize_game_state
+    add  sp, 6
+
+    push g_game_state
+    call draw_game_state_diff
+    add  sp, 2
+
+    ; Draw "start game" banner
+    push RESTART_BANNER_INITIAL
+    call draw_restart_banner
+    add sp, 2
+
+.main_loop:
+
+    ; Wait for input to start game / exit program
+.restart_loop:
+    call get_controls_state
+    mov  bx, ax
+    ; Esc = exit
+    test byte [bx+CONTROLS_STATE_OFF_PAUSE], KEYBOARD_STATE_MASK_WAS_PRESSED
+    jnz  .main_loop_end
+    ; Space/Enter = new game
+    test byte [bx+CONTROLS_STATE_OFF_MENU_SELECT], KEYBOARD_STATE_MASK_WAS_PRESSED
+    jnz  .restart_loop_end
+    jmp .restart_loop
+.restart_loop_end:
+
+    ; Initialize game
+    call delete_entire_screen
+    call draw_game_skeleton
+    call reset_game_state_diff
 
     push g_time_state
     call get_time_delta
@@ -57,13 +94,14 @@ start:
     call initialize_game_state
     add  sp, 6
 
-.main_loop:
+    push g_game_state
+    call draw_game_state_diff
+    add  sp, 2
+
+.game_loop:
+    ; Advance game
     call get_controls_state
     mov  bx, ax
-
-    ; Esc = exit
-    test byte [bx+CONTROLS_STATE_OFF_PAUSE], KEYBOARD_STATE_MASK_WAS_PRESSED
-    jnz  .main_loop_end
 
     push g_time_state
     call get_time_delta
@@ -79,10 +117,23 @@ start:
     call draw_game_state_diff
     add  sp, 2
 
+    ; Handle game over
     test word [g_game_state+GAME_STATE_OFF_FLAGS], GAME_STATE_FLAGS_MASK_GAME_OVER
-    jnz  .main_loop_end
+    jz   .game_loop
 
+    cmp word [g_game_state+GAME_STATE_OFF_MARATHON_LINES], 0
+    jne .lose_banner
+.win_banner:
+    push RESTART_BANNER_WIN
+    call draw_restart_banner
+    add sp, 2
     jmp .main_loop
+.lose_banner:
+    push RESTART_BANNER_LOSE
+    call draw_restart_banner
+    add sp, 2
+    jmp .main_loop
+.game_loop_end:
 .main_loop_end:
 
 .teardown:
