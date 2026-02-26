@@ -199,7 +199,7 @@ advance_game_state:
     mov si, word [bp+8]  ; kb_state
     test byte [si+CONTROLS_STATE_OFF_HOLD], KEYBOARD_STATE_MASK_WAS_PRESSED
     jz  .no_hold
-    
+
     test byte [bx+GAME_STATE_OFF_FLAGS], GAME_STATE_FLAGS_MASK_HOLD
     jnz  .no_hold
 
@@ -217,7 +217,7 @@ advance_game_state:
     mov byte [bx+GAME_STATE_OFF_HOLD], cl
 
     or byte [bx+GAME_STATE_OFF_FLAGS], GAME_STATE_FLAGS_MASK_HOLD
-    
+
     jmp .initialize_tetrimino
 
 .no_hold:
@@ -311,7 +311,7 @@ advance_game_state:
     mov byte [bx+GAME_STATE_OFF_EXTENDED_PLACEMENT], CONSTANT_EXTENDED_PLACEMENT
     mov word [bx+GAME_STATE_OFF_TIMER_LOCK], CONSTANT_LOCK_TIME
 .not_lowest_row:
-    
+
 ; ========== LOCKDOWN ==========
 
     push word [bx+GAME_STATE_OFF_TETRIMINO]
@@ -341,7 +341,7 @@ advance_game_state:
     add sp, 4
 
     mov word [bx+GAME_STATE_OFF_TIMER_GEN],  CONSTANT_GEN_TIME
-    
+
     ; unset hold flag
     mov al, GAME_STATE_FLAGS_MASK_HOLD
     not al
@@ -425,7 +425,7 @@ advance_game_state__side_to_side:
     mov ax, cx
     jmp .resolve_if_both_endif
 .resolve_if_both_endif:
-    
+
     jmp .resolve_endif
 .resolve_elif_left:
     mov ax, GAME_STATE_FLAGS_MASK_DIR_LEFT
@@ -625,7 +625,6 @@ advance_game_state__detect_lock_out:
     mov ax, 1
 
 .return:
-    ;add sp, @@@
     pop bx
     pop di
     pop si

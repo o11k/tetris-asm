@@ -110,7 +110,6 @@ get_time_delta:
     add ax, cx
 
 .done:
-    ;add sp, @@@
     pop bx
     pop bp
     ret

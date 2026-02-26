@@ -271,7 +271,7 @@ draw_border:
     push ax
     ; color
     push word [bp+4]
-    
+
     call draw_rectangle
     add sp, 10
 
@@ -292,7 +292,7 @@ draw_border:
     push ax
     ; color
     push word [bp+4]
-    
+
     call draw_rectangle
     add sp, 10
 
@@ -315,7 +315,7 @@ draw_border:
     push ax
     ; color
     push word [bp+4]
-    
+
     call draw_rectangle
     add sp, 10
 
@@ -336,7 +336,7 @@ draw_border:
     push word [bp+12]     ; obj_right
     ; color
     push word [bp+4]
-    
+
     call draw_rectangle
     add sp, 10
 
@@ -414,11 +414,10 @@ draw_matrix_tetrimino:
     _draw_matrix_tetrimino_single 1
     _draw_matrix_tetrimino_single 2
     _draw_matrix_tetrimino_single 3
-    
+
     add sp, 6
 
 .done:
-    ;add sp, @@@
     pop si
     pop bp
     ret
@@ -520,7 +519,7 @@ macro _dgsd_mino_to_frame index {
     cmp byte [_dgsd_curr_frame+si], MINO_NONE
     je  .no_game_over_mino
     mov byte [_dgsd_curr_frame+si], MINO_DEAD
-.no_game_over_mino:    
+.no_game_over_mino:
 
     inc si
     jmp .loop_game_over

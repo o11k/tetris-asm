@@ -68,7 +68,7 @@ prng_shuffle_bytes:
     mov byte [bx+di], al
 
     jmp .shuffle_loop
-.shuffle_loop_end:    
+.shuffle_loop_end:
 
     pop bx
     pop di

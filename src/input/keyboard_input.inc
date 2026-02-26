@@ -49,7 +49,7 @@ new_int_09h:
     in  al, 60h
     mov si, ax
     and si, 07fh
-    
+
     ; cl will be the final result
     xor cl, cl
 

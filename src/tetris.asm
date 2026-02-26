@@ -43,7 +43,7 @@ start:
     call prng_seed
     add sp, 2
 
-    
+
 .main:
     call draw_game_skeleton
 
