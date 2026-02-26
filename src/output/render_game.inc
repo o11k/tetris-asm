@@ -24,6 +24,8 @@ BORDER_COLOR EQU 0Fh  ; white
 MARATHON_LINES_TOP    EQU 130
 MARATHON_LINES_MIDDLE EQU 70
 
+SECONDS_TOP    EQU 90
+SECONDS_MIDDLE EQU 70
 
 ; void draw_rectangle(byte color, word left_x, word top_y, word width, word height)
 draw_rectangle:
@@ -345,6 +347,7 @@ draw_border:
 
 marathon_lines_text_1: db "  lines  ", 0
 marathon_lines_text_2: db "remaining", 0
+seconds_text: db "seconds", 0
 draw_game_skeleton:
     push word MATRIX_LEFT
     push word MATRIX_RIGHT
@@ -365,6 +368,13 @@ draw_game_skeleton:
     push MARATHON_LINES_MIDDLE-(8*9/2)
     push 18h
     push marathon_lines_text_2
+    call render_text
+    add sp, 8
+
+    push SECONDS_TOP+10
+    push SECONDS_MIDDLE-(8*7/2)
+    push 18h
+    push seconds_text
     call render_text
     add sp, 8
 
@@ -418,6 +428,7 @@ _dgsd_last_frame: times MATRIX_W*MATRIX_H db 0FFh
 _dgsd_curr_frame: times MATRIX_W*MATRIX_H db 0
 _dgsd_last_hold: db MINO_NONE
 _dgsd_last_marathon_lines: dw 0
+_dgsd_last_seconds: dw 0FFFFh
 _dgsd_last_next_queue: times 6 db MINO_NONE
 _dgsd_minos: times 2*4 dw 0
 _dgsd_tetrimino_buffer: times TETRIMINO_SIZE db 0
@@ -607,6 +618,25 @@ macro _dgsd_next_queue index {
     mov ax, word [bx+GAME_STATE_OFF_MARATHON_LINES]
     mov word [_dgsd_last_marathon_lines], ax
 
+    ; Seconds timer
+    mov ax, word [bx+GAME_STATE_OFF_TIMER+0]
+    mov dx, word [bx+GAME_STATE_OFF_TIMER+2]
+    and dx, 3Fh  ; avoid divide error
+    mov cx, 100
+    div cx
+
+    mov cx, word [_dgsd_last_seconds]
+    mov word [_dgsd_last_seconds], ax
+
+    push SECONDS_TOP
+    push SECONDS_MIDDLE
+    push 0
+    push ax
+    push 0
+    push cx
+    call draw_game_state_diff__decimal
+    add sp, 12
+
     pop si
     pop bx
     pop bp
@@ -709,8 +739,8 @@ draw_game_state_diff__decimal:
     add sp, 8
 
     push _dgsd_str_buffer
-    push 0
-    push word [bx+GAME_STATE_OFF_MARATHON_LINES]
+    push word [bp+10]
+    push word [bp+8]
     call dword_to_decimal
     add sp, 6
     push _dgsd_str_buffer

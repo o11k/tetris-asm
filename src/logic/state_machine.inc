@@ -119,6 +119,9 @@ initialize_game_state:
 
     mov word [bx+GAME_STATE_OFF_MARATHON_LINES], CONSTANT_MARATHON_LINES
 
+    mov word [bx+GAME_STATE_OFF_TIMER+0], 0
+    mov word [bx+GAME_STATE_OFF_TIMER+1], 0
+
     pop bx
     pop bp
     ret
@@ -132,6 +135,10 @@ advance_game_state:
     push di
 
     mov bx, word [bp+4]  ; state
+
+    mov ax, word [bp+6]  ; delta_time
+    add word [bx+GAME_STATE_OFF_TIMER+0], ax
+    adc word [bx+GAME_STATE_OFF_TIMER+2], 0
 
 ; ========== GENERATION PHASE ==========
     test word [bx+GAME_STATE_OFF_TIMER_GEN], 0xFFFF

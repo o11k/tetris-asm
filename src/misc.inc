@@ -153,6 +153,7 @@ handle_leading_zeroes:
     cmp byte [bx], 0
     jne .not_end_of_string
     mov byte [bx-1], '0'
+    dec ax
     jmp .loop_chars_end
 
 .not_end_of_string:
