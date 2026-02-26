@@ -21,6 +21,9 @@ GRID_DOT_COLOR EQU 014h
 BORDER_WIDTH EQU 1
 BORDER_COLOR EQU 0Fh  ; white
 
+MARATHON_LINES_TOP  EQU 130
+MARATHON_LINES_LEFT EQU 30
+
 
 ; void draw_rectangle(byte color, word left_x, word top_y, word width, word height)
 draw_rectangle:
@@ -340,6 +343,8 @@ draw_border:
     pop bp
     ret
 
+marathon_lines_text_1: db "  lines", 0
+marathon_lines_text_2: db "remaining", 0
 draw_game_skeleton:
     push word MATRIX_LEFT
     push word MATRIX_RIGHT
@@ -349,6 +354,20 @@ draw_game_skeleton:
     push word BORDER_COLOR
     call draw_border
     add sp, 12
+
+    push MARATHON_LINES_TOP+10
+    push MARATHON_LINES_LEFT
+    push 18h
+    push marathon_lines_text_1
+    call render_text
+    add sp, 8
+    push MARATHON_LINES_TOP+20
+    push MARATHON_LINES_LEFT
+    push 18h
+    push marathon_lines_text_2
+    call render_text
+    add sp, 8
+
     ret
 
 macro _draw_matrix_tetrimino_single index {
@@ -398,9 +417,11 @@ draw_matrix_tetrimino:
 _dgsd_last_frame: times MATRIX_W*MATRIX_H db 0FFh
 _dgsd_curr_frame: times MATRIX_W*MATRIX_H db 0
 _dgsd_last_hold: db MINO_NONE
+_dgsd_last_marathon_lines: dw 0
 _dgsd_last_next_queue: times 6 db MINO_NONE
 _dgsd_minos: times 2*4 dw 0
 _dgsd_tetrimino_buffer: times TETRIMINO_SIZE db 0
+_dgsd_str_buffer: times 11 db 0
 
 ; void draw_game_state_diff(State *state)
 draw_game_state_diff:
@@ -573,6 +594,53 @@ macro _dgsd_next_queue index {
     _dgsd_next_queue 3
     _dgsd_next_queue 4
     _dgsd_next_queue 5
+
+    ; Marathon lines
+    mov ax, word [_dgsd_last_marathon_lines]
+    cmp ax, word [bx+GAME_STATE_OFF_MARATHON_LINES]
+    je  .marathon_lines_unchanged
+
+    push _dgsd_str_buffer
+    push 0
+    push word [_dgsd_last_marathon_lines]
+    call dword_to_decimal
+    add sp, 6
+    push _dgsd_str_buffer
+    call handle_leading_zeroes
+    add sp, 2
+    shl ax, 2
+    neg ax
+    add ax, MARATHON_LINES_LEFT - 4
+    
+    push MARATHON_LINES_TOP
+    push ax
+    push 00h
+    push _dgsd_str_buffer
+    call render_text
+    add sp, 8
+
+    push _dgsd_str_buffer
+    push 0
+    push word [bx+GAME_STATE_OFF_MARATHON_LINES]
+    call dword_to_decimal
+    add sp, 6
+    push _dgsd_str_buffer
+    call handle_leading_zeroes
+    add sp, 2
+    shl ax, 2
+    neg ax
+    add ax, MARATHON_LINES_LEFT - 4
+    
+    push MARATHON_LINES_TOP
+    push ax
+    push 0Fh
+    push _dgsd_str_buffer
+    call render_text
+    add sp, 8
+
+    mov ax, word [bx+GAME_STATE_OFF_MARATHON_LINES]
+    mov word [_dgsd_last_marathon_lines], ax
+.marathon_lines_unchanged:
 
     pop si
     pop bx

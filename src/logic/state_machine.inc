@@ -117,6 +117,8 @@ initialize_game_state:
 
     mov byte [bx+GAME_STATE_OFF_HOLD], MINO_NONE
 
+    mov word [bx+GAME_STATE_OFF_MARATHON_LINES], CONSTANT_MARATHON_LINES
+
     pop bx
     pop bp
     ret
@@ -341,6 +343,13 @@ advance_game_state:
     push word [bx+GAME_STATE_OFF_MATRIX]
     call advance_game_state__line_clears
     add sp, 2
+
+    sub word [bx+GAME_STATE_OFF_MARATHON_LINES], ax
+    ja  .no_zero_marathon
+
+    mov word [bx+GAME_STATE_OFF_MARATHON_LINES], 0
+    or  word [bx+GAME_STATE_OFF_FLAGS], GAME_STATE_FLAGS_MASK_GAME_OVER
+.no_zero_marathon:
 
 .no_lockdown:
 
